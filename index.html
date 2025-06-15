@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>批量网易云音乐下载器 By ENA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-in;
+        }
+        body {
+            background-image: url('https://api.imlazy.ink/img');
+            background-size: cover;
+            background-attachment: fixed;
+            color: black;
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
+        }
+        .hover-effect {
+            transition: backdrop-filter 0.2s ease, transform 0.2s ease;
+        }
+        .hover-effect:hover {
+            backdrop-filter: none;
+            transform: scale(1.05);
+        }
+        button, select, input {
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.7);
+            color: black;
+        }
+        input::placeholder {
+            color: rgba(0, 0, 0, 0.6);
+        }
+        header, footer {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+        }
+        .quality-label-bg {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+    </style>
+</head>
+<body class="font-sans min-h-screen flex flex-col">
+    <header class="glass-effect py-6 shadow-lg">
+        <div class="container mx-auto px-4">
+            <h1 class="text-3xl font-bold text-center">网易云音乐批量下载器</h1>
+            <div class="flex justify-center mt-4 gap-2">
+                <select id="search-type" class="p-2 bg-transparent glass-effect">
+                    <option value="1">单曲</option>
+                    <option value="1000">歌单</option>
+                </select>
+                <input type="text" id="search-input" placeholder="输入关键词以搜索  或输入歌单ID直接跳转" class="p-2 w-96 bg-transparent glass-effect">
+                <button id="search-btn" class="p-2 bg-blue-500 hover-effect">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+    <main class="container mx-auto px-4 py-6 flex-grow">
+        <div id="options" class="flex justify-between mb-4 hidden">
+            <div class="flex items-center">
+                <label for="quality-select" class="mr-2 self-center quality-label-bg">音质选择：</label>
+                <select id="quality-select" class="p-2 bg-transparent glass-effect">
+                    <option value="standard">标准</option>
+                    <option value="higher">较高</option>
+                    <option value="exhigh">极高</option>
+                    <option value="lossless">无损</option>
+                    <option value="hires">Hi-Res</option>
+                    <option value="jyeffect">高清环绕声</option>
+                    <option value="dolby">杜比全景声</option>
+                    <option value="jymaster">超清母带</option>
+                </select>
+            </div>
+            <button id="download-btn" class="p-2 bg-green-500 hover-effect">
+                <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                下载所选
+            </button>
+        </div>
+        <div id="loading" class="text-center hidden glass-effect" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 10px; z-index: 999;">加载中...</div>
+        <div id="playlist-details" class="glass-effect p-4 mt-4 hidden animate-fadeIn">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center">
+                    <button id="back-btn" class="p-2 bg-gray-500 hover-effect mr-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                    <h2 id="playlist-title" class="text-xl font-bold"></h2>
+                </div>
+                <button id="select-all-btn" class="p-2 bg-blue-500 hover-effect">全选</button>
+            </div>
+        </div>
+        <div id="search-results" class="glass-effect p-4 hidden animate-fadeIn"></div>
+        <div id="pagination" class="flex justify-center gap-2 mt-4 hidden"></div>
+        <div id="preview" class="glass-effect p-4 hidden z-50 fixed"></div>
+    </main>
+    <footer class="glass-effect py-4 w-full" id="footer">
+        <div class="container mx-auto px-4 text-center">
+            <p>by <a href="https://enashpinal.pages.dev" class="underline hover:text-blue-500">Enashpinal</a></p>
+        </div>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>
