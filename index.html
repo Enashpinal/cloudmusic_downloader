@@ -7,51 +7,672 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
+        :root {
+            --theme-color: #ff6b35;
+            --theme-dark: #e55a2b;
+            --theme-light: #ff8c60;
+        }
+
         @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
         .animate-fadeIn {
-            animation: fadeIn 0.5s ease-in;
+            animation: fadeIn 0.6s ease-out;
         }
+
+        .animate-slideIn {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .animate-slideInRight {
+            animation: slideInRight 0.5s ease-out;
+        }
+
         body {
             background-image: url('https://api.imlazy.ink/img');
             background-size: cover;
             background-attachment: fixed;
-            color: black;
+            color: #1a1a1a;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
         }
+
         .glass-effect {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            transition: all 0.3s ease;
         }
-        .hover-effect {
-            transition: backdrop-filter 0.2s ease, transform 0.2s ease;
+
+        .glass-effect:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
-        .hover-effect:hover {
-            backdrop-filter: none;
+
+        header {
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            color: #1a1a1a;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .wave-group {
+            position: relative;
+            width: 24rem;
+            margin: 0 auto;
+        }
+
+        .wave-group .input {
+            font-size: 1rem;
+            padding: 0.75rem 0.75rem 0.75rem 0.25rem;
+            display: block;
+            width: 100%;
+            border: none;
+            border-bottom: 2px solid #333;
+            background: transparent;
+            color: #1a1a1a;
+            transition: border-color 0.3s ease;
+        }
+
+        .wave-group .input:focus {
+            outline: none;
+            border-bottom-color: var(--theme-color);
+        }
+
+        .wave-group .label {
+            color: #666;
+            font-size: 1.125rem;
+            font-weight: normal;
+            position: absolute;
+            pointer-events: none;
+            left: 0.25rem;
+            top: 0.75rem;
+            display: flex;
+            transition: all 0.2s ease;
+        }
+
+        .wave-group .label-char {
+            transition: 0.2s ease all;
+            transition-delay: calc(var(--index) * 0.05s);
+        }
+
+        .wave-group .input:focus ~ .label .label-char,
+        .wave-group .input:valid ~ .label .label-char {
+            transform: translateY(-1.25rem);
+            font-size: 0.875rem;
+            color: var(--theme-color);
+        }
+
+        .wave-group .bar {
+            position: relative;
+            display: block;
+            width: 100%;
+        }
+
+        .wave-group .bar:before,
+        .wave-group .bar:after {
+            content: '';
+            height: 2px;
+            width: 0;
+            bottom: 0;
+            position: absolute;
+            background: var(--theme-color);
+            transition: 0.3s ease all;
+        }
+
+        .wave-group .bar:before {
+            left: 50%;
+        }
+
+        .wave-group .bar:after {
+            right: 50%;
+        }
+
+        .wave-group .input:focus ~ .bar:before,
+        .wave-group .input:focus ~ .bar:after {
+            width: 50%;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 15px;
+            color: #1a1a1a;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            position: relative;
+            font-weight: 700;
+            font-size: 1rem;
+            box-shadow: 4px 8px 19px -3px rgba(0, 0, 0, 0.27);
+            transition: all 0.25s ease;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        button::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0;
+            border-radius: 15px;
+            background-color: var(--theme-color);
+            z-index: -1;
+            box-shadow: 4px 8px 19px -3px rgba(0, 0, 0, 0.27);
+            transition: width 0.25s ease;
+        }
+
+        button:hover {
+            color: #ffffff;
+        }
+
+        button:hover::before {
+            width: 100%;
+        }
+
+        #search-btn {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            box-shadow: 4px 8px 19px -3px rgba(0, 0, 0, 0.27);
+            padding: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 15px;
+            transition: none;
+        }
+
+        #search-btn svg {
+            width: 1.5rem;
+            height: 1.5rem;
+            stroke: #000000;
+        }
+
+        select {
+            padding: 0.5rem;
+            border: 2px solid #333;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
+            color: #1a1a1a;
+            transition: all 0.3s ease;
+            animation: fadeIn 0.7s ease-out;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--theme-color);
+            box-shadow: 0 0 10px rgba(255, 107, 53, 0.3);
+        }
+
+        .song-item {
+            transition: all 0.3s ease;
+        }
+
+        .song-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .neon-checkbox {
+            --primary: var(--theme-color);
+            --primary-dark: var(--theme-dark);
+            --primary-light: var(--theme-light);
+            --size: 20px;
+            position: relative;
+            width: var(--size);
+            height: var(--size);
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .neon-checkbox input {
+            display: none;
+        }
+
+        .neon-checkbox__frame {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .neon-checkbox__box {
+            position: absolute;
+            inset: 0;
+            background: transparent;
+            border-radius: 4px;
+            border: 2px solid var(--primary-dark);
+            transition: all 0.4s ease;
+        }
+
+        .neon-checkbox__check-container {
+            position: absolute;
+            inset: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .neon-checkbox__check {
+            width: 80%;
+            height: 80%;
+            fill: none;
+            stroke: var(--primary);
+            stroke-width: 3;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            stroke-dasharray: 40;
+            stroke-dashoffset: 40;
+            transform-origin: center;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .neon-checkbox__glow {
+            position: absolute;
+            inset: -2px;
+            border-radius: 6px;
+            background: var(--primary);
+            opacity: 0;
+            filter: blur(8px);
+            transform: scale(1.2);
+            transition: all 0.4s ease;
+        }
+
+        .neon-checkbox__borders {
+            position: absolute;
+            inset: 0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .neon-checkbox__borders span {
+            position: absolute;
+            width: 40px;
+            height: 1px;
+            background: var(--primary);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .neon-checkbox__borders span:nth-child(1) {
+            top: 0;
+            left: -100%;
+            animation: borderFlow1 2s linear infinite;
+        }
+
+        .neon-checkbox__borders span:nth-child(2) {
+            top: -100%;
+            right: 0;
+            width: 1px;
+            height: 40px;
+            animation: borderFlow2 2s linear infinite;
+        }
+
+        .neon-checkbox__borders span:nth-child(3) {
+            bottom: 0;
+            right: -100%;
+            animation: borderFlow3 2s linear infinite;
+        }
+
+        .neon-checkbox__borders span:nth-child(4) {
+            bottom: -100%;
+            left: 0;
+            width: 1px;
+            height: 40px;
+            animation: borderFlow4 2s linear infinite;
+        }
+
+        .neon-checkbox__particles span {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            top: 50%;
+            left: 50%;
+            box-shadow: 0 0 6px var(--primary);
+        }
+
+        .neon-checkbox__rings {
+            position: absolute;
+            inset: -20px;
+            pointer-events: none;
+        }
+
+        .neon-checkbox__rings .ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            border: 1px solid var(--primary);
+            opacity: 0;
+            transform: scale(0);
+        }
+
+        .neon-checkbox__sparks span {
+            position: absolute;
+            width: 20px;
+            height: 1px;
+            background: linear-gradient(90deg, var(--primary), transparent);
+            opacity: 0;
+        }
+
+        .neon-checkbox:hover .neon-checkbox__box {
+            border-color: var(--primary);
             transform: scale(1.05);
         }
-        button, select, input {
-            border-radius: 8px;
-            border: 1px solid rgba(0, 0, 0, 0.2);
-            background: rgba(255, 255, 255, 0.7);
-            color: black;
+
+        .neon-checkbox input:checked ~ .neon-checkbox__frame .neon-checkbox__box {
+            border-color: var(--primary);
+            background: rgba(255, 107, 53, 0.1);
         }
-        input::placeholder {
-            color: rgba(0, 0, 0, 0.6);
+
+        .neon-checkbox input:checked ~ .neon-checkbox__frame .neon-checkbox__check {
+            stroke-dashoffset: 0;
+            transform: scale(1.1);
         }
-        header, footer {
-            background: rgba(255, 255, 255, 0.5);
-            backdrop-filter: blur(10px);
+
+        .neon-checkbox input:checked ~ .neon-checkbox__frame .neon-checkbox__glow {
+            opacity: 0.2;
         }
+
+        .neon-checkbox input:checked ~ .neon-checkbox__frame .neon-checkbox__borders span {
+            opacity: 1;
+        }
+
+        .neon-checkbox input:checked ~ .neon-checkbox__frame .neon-checkbox__particles span {
+            animation: particleExplosion 0.6s ease-out forwards;
+        }
+
+        .neon-checkbox input:checked ~ .neon-checkbox__frame .neon-checkbox__rings .ring {
+            animation: ringPulse 0.6s ease-out forwards;
+        }
+
+        .neon-checkbox input:checked ~ .neon-checkbox__frame .neon-checkbox__sparks span {
+            animation: sparkFlash 0.6s ease-out forwards;
+        }
+
+        @keyframes borderFlow1 {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(200%); }
+        }
+
+        @keyframes borderFlow2 {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(200%); }
+        }
+
+        @keyframes borderFlow3 {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-200%); }
+        }
+
+        @keyframes borderFlow4 {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-200%); }
+        }
+
+        @keyframes particleExplosion {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: translate(calc(-50% + var(--x, 20px)), calc(-50% + var(--y, 20px))) scale(0); opacity: 0; }
+        }
+
+        @keyframes ringPulse {
+            0% { transform: scale(0); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        @keyframes sparkFlash {
+            0% { transform: rotate(var(--r, 0deg)) translateX(0) scale(1); opacity: 1; }
+            100% { transform: rotate(var(--r, 0deg)) translateX(30px) scale(0); opacity: 0; }
+        }
+
+        .neon-checkbox__particles span:nth-child(1) { --x: 25px; --y: -25px; }
+        .neon-checkbox__particles span:nth-child(2) { --x: -25px; --y: -25px; }
+        .neon-checkbox__particles span:nth-child(3) { --x: 25px; --y: 25px; }
+        .neon-checkbox__particles span:nth-child(4) { --x: -25px; --y: 25px; }
+        .neon-checkbox__particles span:nth-child(5) { --x: 35px; --y: 0px; }
+        .neon-checkbox__particles span:nth-child(6) { --x: -35px; --y: 0px; }
+        .neon-checkbox__particles span:nth-child(7) { --x: 0px; --y: 35px; }
+        .neon-checkbox__particles span:nth-child(8) { --x: 0px; --y: -35px; }
+        .neon-checkbox__particles span:nth-child(9) { --x: 20px; --y: -30px; }
+        .neon-checkbox__particles span:nth-child(10) { --x: -20px; --y: 30px; }
+        .neon-checkbox__particles span:nth-child(11) { --x: 30px; --y: 20px; }
+        .neon-checkbox__particles span:nth-child(12) { --x: -30px; --y: -20px; }
+
+        .neon-checkbox__sparks span:nth-child(1) { --r: 0deg; top: 50%; left: 50%; }
+        .neon-checkbox__sparks span:nth-child(2) { --r: 90deg; top: 50%; left: 50%; }
+        .neon-checkbox__sparks span:nth-child(3) { --r: 180deg; top: 50%; left: 50%; }
+        .neon-checkbox__sparks span:nth-child(4) { --r: 270deg; top: 50%; left: 50%; }
+
+        .neon-checkbox__rings .ring:nth-child(1) { animation-delay: 0s; }
+        .neon-checkbox__rings .ring:nth-child(2) { animation-delay: 0.1s; }
+        .neon-checkbox__rings .ring:nth-child(3) { animation-delay: 0.2s; }
+
+        main {
+            flex-grow: 1;
+            padding: 2rem 1rem;
+        }
+
+        #options {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            animation: fadeIn 0.6s ease-out;
+            transition: opacity 0.3s ease;
+        }
+
         .quality-label-bg {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            padding: 0.5rem 0.75rem;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 1rem 2rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--theme-color);
+            transition: opacity 0.3s ease;
+            z-index: 999;
+        }
+
+        #playlist-details {
+            padding: 1rem;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        #playlist-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+
+        #search-results {
+            padding: 1.5rem;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        #search-results.fade-out {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        #search-results.fade-in {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            transition: opacity 0.3s ease;
+        }
+
+        .pagination-link {
+            transition: all 0.2s ease;
+        }
+
+        .pagination-link:hover {
+            transform: scale(1.1);
+        }
+
+        #preview {
+            padding: 1.5rem;
+            position: fixed;
+            z-index: 50;
+            transition: all 0.3s ease;
+        }
+
+        footer {
+            padding: 1rem 0;
+            transition: all 0.3s ease;
+        }
+
+        footer p {
+            font-size: 0.9rem;
+            color: #1a1a1a;
+        }
+
+        footer a {
+            color: var(--theme-color);
+            transition: color 0.3s ease;
+        }
+
+        footer a:hover {
+            color: var(--theme-light);
+            text-decoration: underline;
+        }
+
+        .hidden {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .download-btn {
+            background: #4caf50;
+            color: white;
+            padding: 0.5rem 1rem;
             border-radius: 8px;
-            padding: 8px 12px;
+        }
+
+        .preview-btn {
+            background: #2196f3;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        .button {
+            position: relative;
+            width: 3em;
+            height: 1.5em;
+            border: none;
+            background: none;
+        }
+
+        .X {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 33%;
+            width: 1.2em;
+            height: 1px;
+            background-color: #000;
+            transform: rotate(45deg);
+        }
+
+        .Y {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 33%;
+            width: 1.2em;
+            height: 1px;
+            background-color: #000;
+            transform: rotate(-45deg);
+        }
+
+        .close {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            bottom: -40%;
+            left: 70%;
+            width: 2em;
+            height: 1.2em;
+            font-size: 10px;
+            background-color: rgb(254, 255, 225);
+            color: #000;
+            border: 1px solid #000;
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        .button:hover {
+            background-color: rgb(210, 0, 0);
+        }
+
+        .button:active {
+            background-color: rgb(130, 0, 0);
+        }
+
+        .button:hover > .close {
+            animation: close 0.2s forwards 1.25s;
+        }
+
+        @keyframes close {
+            100% {
+                opacity: 1;
+            }
         }
     </style>
 </head>
@@ -62,10 +683,22 @@
             <div class="flex justify-center mt-4 gap-2">
                 <select id="search-type" class="p-2 bg-transparent glass-effect">
                     <option value="1">单曲</option>
+                    <option value="10">专辑</option>
                     <option value="1000">歌单</option>
                 </select>
-                <input type="text" id="search-input" placeholder="输入关键词以搜索  或输入歌单ID直接跳转" class="p-2 w-96 bg-transparent glass-effect">
-                <button id="search-btn" class="p-2 bg-blue-500 hover-effect">
+                <div class="wave-group">
+                    <input required="" type="text" class="input" id="search-input">
+                    <span class="bar"></span>
+                    <label class="label">
+                        <span class="label-char" style="--index: 0">S</span>
+                        <span class="label-char" style="--index: 1">e</span>
+                        <span class="label-char" style="--index: 2">a</span>
+                        <span class="label-char" style="--index: 3">r</span>
+                        <span class="label-char" style="--index: 4">c</span>
+                        <span class="label-char" style="--index: 5">h</span>
+                    </label>
+                </div>
+                <button id="search-btn" class="p-2">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                     </svg>
@@ -88,7 +721,7 @@
                     <option value="jymaster">超清母带</option>
                 </select>
             </div>
-            <button id="download-btn" class="p-2 bg-green-500 hover-effect">
+            <button id="download-btn" class="p-2">
                 <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                 </svg>
@@ -96,28 +729,552 @@
             </button>
         </div>
         <div id="loading" class="text-center hidden glass-effect" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 10px; z-index: 999;">加载中...</div>
-        <div id="playlist-details" class="glass-effect p-4 mt-4 hidden animate-fadeIn">
+        <div id="playlist-details" class="glass-effect p-4 mt-4 hidden">
             <div class="flex justify-between items-center mb-4">
                 <div class="flex items-center">
-                    <button id="back-btn" class="p-2 bg-gray-500 hover-effect mr-2">
+                    <button id="back-btn" class="p-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
                         </svg>
                     </button>
                     <h2 id="playlist-title" class="text-xl font-bold"></h2>
                 </div>
-                <button id="select-all-btn" class="p-2 bg-blue-500 hover-effect">全选</button>
+                <button id="select-all-btn" class="p-2">全选</button>
             </div>
         </div>
-        <div id="search-results" class="glass-effect p-4 hidden animate-fadeIn"></div>
+        <div id="search-results" class="glass-effect p-4 hidden"></div>
         <div id="pagination" class="flex justify-center gap-2 mt-4 hidden"></div>
         <div id="preview" class="glass-effect p-4 hidden z-50 fixed"></div>
     </main>
     <footer class="glass-effect py-4 w-full" id="footer">
         <div class="container mx-auto px-4 text-center">
-            <p>by <a href="https://enashpinal.pages.dev" class="underline hover:text-blue-500">Enashpinal</a></p>
+            <p>by <a href="https://enashpinal.pages.dev">Enashpinal</a></p>
         </div>
     </footer>
-    <script src="script.js"></script>
+    <script>
+const apiUrl = 'https://163api.qijieya.cn';
+const itemsPerPage = 100;
+let currentPage = 1;
+let totalItems = 0;
+let searchType = '1';
+let searchKeywords = '';
+let selectedSongs = [];
+let playlistState = null;
+let albumState = null;
+let currentMode = 'initial';
+let isDownloading = false;
+
+document.getElementById('search-btn').addEventListener('click', async () => {
+    searchType = document.getElementById('search-type').value;
+    searchKeywords = document.getElementById('search-input').value.trim();
+    if (!searchKeywords) {
+        alert('请输入搜索关键词！');
+        return;
+    }
+    currentPage = 1;
+    const resultsDiv = document.getElementById('search-results');
+    resultsDiv.classList.add('fade-out');
+
+    setTimeout(async () => {
+        if (searchType === '1000' && /^\d{5,}$/.test(searchKeywords)) {
+            currentMode = 'playlist-songs';
+            await tryOpenPlaylistById(searchKeywords);
+        } else {
+            currentMode = searchType === '1' ? 'search' : (searchType === '10' ? 'album' : 'playlist');
+            showElements(true);
+            searchMusic();
+        }
+        resultsDiv.classList.remove('fade-out');
+        resultsDiv.classList.add('fade-in');
+    }, 300);
+});
+
+function showElements(show) {
+    document.getElementById('options').classList.toggle('hidden', !show);
+    document.getElementById('search-results').classList.toggle('hidden', !show);
+    document.getElementById('pagination').classList.toggle('hidden', !show);
+    document.getElementById('footer').classList.toggle('hidden', !show);
+    document.getElementById('playlist-details').classList.toggle('hidden', !(show && (currentMode === 'playlist-songs' || currentMode === 'album-songs')));
+}
+
+function showLoading(show) {
+    const loadingEl = document.getElementById('loading');
+    if (show) {
+        loadingEl.classList.remove('hidden');
+    } else if (!isDownloading) {
+        loadingEl.classList.add('hidden');
+    }
+}
+
+async function fetchWithRetry(url, options = {}, retries = 1, timeout = 15000) {
+    for (let i = 0; i <= retries; i++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                throw new Error(`HTTP 错误: ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.code !== 200) {
+                throw new Error(`API 错误: ${data.message || '响应代码非200'}`);
+            }
+            return data;
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (i < retries && error.name !== 'AbortError') {
+                console.warn(`请求失败，重试 ${i + 1}/${retries}:`, error);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
+async function searchMusic() {
+    showLoading(true);
+    const offset = (currentPage - 1) * itemsPerPage;
+    try {
+        const data = await fetchWithRetry(
+            `${apiUrl}/cloudsearch?keywords=${encodeURIComponent(searchKeywords)}&type=${searchType}&limit=${itemsPerPage}&offset=${offset}`
+        );
+        showLoading(false);
+        if (searchType === '1') {
+            displaySongs(data.result.songs || [], 'search-results');
+            totalItems = data.result.songCount || 0;
+        } else if (searchType === '10') {
+            albumState = { albums: data.result.albums || [], page: currentPage, keywords: searchKeywords };
+            displayAlbums(data.result.albums || []);
+            totalItems = data.result.albumCount || 0;
+        } else {
+            playlistState = { playlists: data.result.playlists || [], page: currentPage, keywords: searchKeywords };
+            displayPlaylists(data.result.playlists || []);
+            totalItems = data.result.playlistCount || 0;
+        }
+        renderPagination();
+    } catch (error) {
+        showLoading(false);
+        console.error('搜索失败:', error);
+        alert(error.name === 'AbortError' ? '请求超时，请稍后重试！' : '搜索失败，请检查网络！');
+    }
+}
+
+async function tryOpenPlaylistById(playlistId) {
+    showLoading(true);
+    try {
+        const data = await fetchWithRetry(`${apiUrl}/playlist/detail?id=${playlistId}`);
+        if (data.playlist) {
+            currentMode = 'playlist-songs';
+            playlistState = { id: playlistId, name: data.playlist.name, trackCount: data.playlist.trackCount, page: currentPage };
+            openPlaylist(playlistId, data.playlist.name, data.playlist.trackCount);
+        } else {
+            currentMode = 'playlist';
+            searchMusic();
+        }
+    } catch (error) {
+        showLoading(false);
+        console.error('获取歌单失败:', error);
+        alert(error.name === 'AbortError' ? '请求超时，请稍后重试！' : '请求错误，请稍后再试');
+        currentMode = 'playlist';
+        searchMusic();
+    }
+}
+
+function displaySongs(songs, containerId) {
+    const resultsDiv = document.getElementById(containerId);
+    resultsDiv.innerHTML = '';
+    if (songs.length === 0) {
+        resultsDiv.innerHTML = '<p>无结果</p>';
+        return;
+    }
+    songs.forEach((song, index) => {
+        const artists = song.ar ? song.ar.map(a => a.name).join(', ') : song.artists.map(a => a.name).join(', ');
+        const songDiv = document.createElement('div');
+        songDiv.className = 'song-item flex items-center p-2 border-b glass-effect my-2 animate-slideInRight';
+        songDiv.style.animationDelay = `${index * 0.1}s`;
+        songDiv.innerHTML = `
+            <img src="${song.al?.picUrl || 'https://p2.music.126.net/6y-UleORITEDbvrOLV0Q8A==/5639395138885805.jpg'}" alt="封面" class="w-12 h-12 rounded mr-2">
+            <label class="neon-checkbox mr-2">
+                <input type="checkbox" class="song-checkbox" data-id="${song.id}">
+                <div class="neon-checkbox__frame">
+                    <div class="neon-checkbox__box">
+                        <div class="neon-checkbox__check-container">
+                            <svg viewBox="0 0 24 24" class="neon-checkbox__check">
+                                <path d="M3,12.5l7,7L21,5"></path>
+                            </svg>
+                        </div>
+                        <div class="neon-checkbox__glow"></div>
+                        <div class="neon-checkbox__borders">
+                            <span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div class="neon-checkbox__effects">
+                        <div class="neon-checkbox__particles">
+                            <span></span><span></span><span></span><span></span> <span></span
+                            ><span></span><span></span><span></span> <span></span><span></span
+                            ><span></span><span></span>
+                        </div>
+                        <div class="neon-checkbox__rings">
+                            <div class="ring"></div>
+                            <div class="ring"></div>
+                            <div class="ring"></div>
+                        </div>
+                        <div class="neon-checkbox__sparks">
+                            <span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+            </label>
+            <span class="flex-1 cursor-pointer" data-id="${song.id}">
+                ${song.name} <span class="text-gray-500 text-sm"> - ${artists}</span>
+            </span>
+            <button class="download-btn px-2 py-1 mr-2" data-id="${song.id}" data-name="${song.name} - ${artists}">
+                <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+            </button>
+            <button class="preview-btn px-2 py-1" data-id="${song.id}">
+                <svg class="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.2A1 1 0 0010 9.768v4.464a1 1 0 001.555.832l3.197-2.2a1 1 0 000-1.664z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </button>
+        `;
+        resultsDiv.appendChild(songDiv);
+    });
+}
+
+function displayAlbums(albums) {
+    const resultsDiv = document.getElementById('search-results');
+    resultsDiv.innerHTML = '';
+    if (albums.length === 0) {
+        resultsDiv.innerHTML = '<p>无结果</p>';
+        return;
+    }
+    albums.forEach((album, index) => {
+        const artistName = album.artists && album.artists.length > 0 ? album.artists[0].name : (album.artist ? album.artist.name : '未知艺术家');
+        const albumDiv = document.createElement('div');
+        albumDiv.className = 'flex items-center p-2 border-b hover:bg-gray-50 hover:shadow-md cursor-pointer transition-all duration-200 glass-effect my-2 animate-slideInRight';
+        albumDiv.style.animationDelay = `${index * 0.1}s`;
+        albumDiv.dataset.id = album.id;
+        albumDiv.dataset.name = album.name;
+        albumDiv.dataset.artist = artistName;
+        albumDiv.dataset.trackCount = album.size;
+        albumDiv.innerHTML = `
+            <img src="${album.picUrl || 'https://p2.music.126.net/6y-UleORITEDbvrOLV0Q8A==/5639395138885805.jpg'}" alt="封面" class="w-12 h-12 rounded mr-5">
+            <div class="flex-1">
+                <div class="font-medium">${album.name}</div>
+                <div class="text-gray-500 text-sm">${artistName} <span class="text-gray-400">(${album.size}首)</span></div>
+            </div>
+        `;
+        albumDiv.addEventListener('dblclick', () => {
+            currentMode = 'album-songs';
+            albumState = { ...albumState, id: album.id, name: album.name, trackCount: album.size };
+            currentPage = 1;
+            openAlbum(album.id, album.name, album.size);
+        });
+        resultsDiv.appendChild(albumDiv);
+    });
+}
+
+function displayPlaylists(playlists) {
+    const resultsDiv = document.getElementById('search-results');
+    resultsDiv.innerHTML = '';
+    if (playlists.length === 0) {
+        resultsDiv.innerHTML = '<p>无结果</p>';
+        return;
+    }
+    playlists.forEach((playlist, index) => {
+        const playlistDiv = document.createElement('div');
+        playlistDiv.className = 'flex items-center p-2 border-b hover:bg-gray-50 hover:shadow-md cursor-pointer transition-all duration-200 glass-effect my-2 animate-slideInRight';
+        playlistDiv.style.animationDelay = `${index * 0.1}s`;
+        playlistDiv.dataset.id = playlist.id;
+        playlistDiv.dataset.name = playlist.name;
+        playlistDiv.dataset.trackCount = playlist.trackCount;
+        playlistDiv.innerHTML = `
+            <img src="${playlist.coverImgUrl || 'https://p2.music.126.net/6y-UleORITEDbvrOLV0Q8A==/5639395138885805.jpg'}" alt="封面" class="w-12 h-12 rounded mr-5">
+            <span class="flex-1">${playlist.name} <span class="text-gray-500 text-sm">(${playlist.trackCount}首)</span></span>
+        `;
+        playlistDiv.addEventListener('dblclick', () => {
+            currentMode = 'playlist-songs';
+            playlistState = { ...playlistState, id: playlist.id, name: playlist.name, trackCount: playlist.trackCount };
+            currentPage = 1;
+            openPlaylist(playlist.id, playlist.name, playlist.trackCount);
+        });
+        resultsDiv.appendChild(playlistDiv);
+    });
+}
+
+function renderPagination() {
+    const paginationDiv = document.getElementById('pagination');
+    paginationDiv.innerHTML = '';
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (totalPages <= 15) {
+        for (let i = 1; i <= totalPages; i++) {
+            const pageLink = document.createElement('a');
+            pageLink.href = '#';
+            pageLink.textContent = i;
+            pageLink.className = `pagination-link px-3 py-1 rounded mx-1 glass-effect ${i === currentPage ? 'bg-var(--theme-color) text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+            pageLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentPage = i;
+                updatePagination();
+            });
+            paginationDiv.appendChild(pageLink);
+        }
+    } else {
+        const scrollContainer = document.createElement('div');
+        scrollContainer.className = 'overflow-x-auto whitespace-nowrap';
+        for (let i = 1; i <= totalPages; i++) {
+            const pageLink = document.createElement('a');
+            pageLink.href = '#';
+            pageLink.textContent = i;
+            pageLink.className = `pagination-link inline-block px-3 py-1 rounded mx-1 glass-effect ${i === currentPage ? 'bg-var(--theme-color) text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+            pageLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                currentPage = i;
+                updatePagination();
+            });
+            scrollContainer.appendChild(pageLink);
+        }
+        paginationDiv.appendChild(scrollContainer);
+    }
+}
+
+function updatePagination() {
+    const resultsDiv = document.getElementById('search-results');
+    resultsDiv.classList.add('fade-out');
+    setTimeout(() => {
+        if (currentMode === 'playlist') {
+            searchMusic();
+        } else if (currentMode === 'album') {
+            searchMusic();
+        } else if (currentMode === 'playlist-songs') {
+            openPlaylist(playlistState.id, playlistState.name, playlistState.trackCount);
+        } else if (currentMode === 'album-songs') {
+            openAlbum(albumState.id, albumState.name, albumState.trackCount);
+        } else {
+            searchMusic();
+        }
+        resultsDiv.classList.remove('fade-out');
+        resultsDiv.classList.add('fade-in');
+    }, 300);
+}
+
+async function openPlaylist(playlistId, playlistName, trackCount) {
+    showLoading(true);
+    const offset = (currentPage - 1) * itemsPerPage;
+    try {
+        const data = await fetchWithRetry(`${apiUrl}/playlist/track/all?id=${playlistId}&limit=${itemsPerPage}&offset=${offset}`);
+        showLoading(false);
+        document.getElementById('playlist-title').textContent = playlistName;
+        const selectAllBtn = document.getElementById('select-all-btn');
+        selectAllBtn.removeEventListener('click', selectAllHandler);
+        selectAllBtn.addEventListener('click', selectAllHandler);
+        document.getElementById('back-btn').removeEventListener('click', playlistBackHandler);
+        document.getElementById('back-btn').addEventListener('click', playlistBackHandler, { once: true });
+        displaySongs(data.songs, 'search-results');
+        totalItems = trackCount || data.songs.length;
+        renderPagination();
+        showElements(true);
+    } catch (error) {
+        showLoading(false);
+        console.error('获取歌单失败:', error);
+        alert(error.name === 'AbortError' ? '加载歌单超时，请稍后重试！' : '获取歌单失败，请检查网络！');
+    }
+}
+
+async function openAlbum(albumId, albumName, trackCount) {
+    showLoading(true);
+    const offset = (currentPage - 1) * itemsPerPage;
+    try {
+        const data = await fetchWithRetry(`${apiUrl}/album?id=${albumId}`);
+        showLoading(false);
+        document.getElementById('playlist-title').textContent = `${albumName} - 专辑`;
+        const selectAllBtn = document.getElementById('select-all-btn');
+        selectAllBtn.removeEventListener('click', selectAllHandler);
+        selectAllBtn.addEventListener('click', selectAllHandler);
+        document.getElementById('back-btn').removeEventListener('click', albumBackHandler);
+        document.getElementById('back-btn').addEventListener('click', albumBackHandler, { once: true });
+        displaySongs(data.songs || [], 'search-results');
+        totalItems = trackCount || data.songs.length;
+        renderPagination();
+        showElements(true);
+    } catch (error) {
+        showLoading(false);
+        console.error('获取专辑失败:', error);
+        alert(error.name === 'AbortError' ? '加载专辑超时，请稍后重试！' : '获取专辑失败，请检查网络！');
+    }
+}
+
+function selectAllHandler() {
+    const checkboxes = document.querySelectorAll('.song-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+}
+
+function playlistBackHandler() {
+    currentMode = 'playlist';
+    currentPage = playlistState.page || 1;
+    searchKeywords = playlistState.keywords || searchKeywords;
+    searchMusic();
+    document.getElementById('playlist-details').classList.add('hidden');
+}
+
+function albumBackHandler() {
+    currentMode = 'album';
+    currentPage = albumState.page || 1;
+    searchKeywords = albumState.keywords || searchKeywords;
+    searchMusic();
+    document.getElementById('playlist-details').classList.add('hidden');
+}
+
+document.addEventListener('click', async (e) => {
+    const previewDiv = document.getElementById('preview');
+    if (!e.target.closest('#preview') && !e.target.closest('.preview-btn') && !previewDiv.classList.contains('hidden')) {
+        previewDiv.classList.add('hidden');
+        previewDiv.innerHTML = '';
+    }
+    if (e.target.closest('span.cursor-pointer')) {
+        const checkbox = e.target.closest('span').parentElement.querySelector('.song-checkbox');
+        checkbox.checked = !checkbox.checked;
+    }
+    if (e.target.closest('.preview-btn')) {
+        const songId = e.target.closest('.preview-btn').dataset.id;
+        const quality = document.getElementById('quality-select').value;
+        showLoading(true);
+        try {
+            const data = await fetchWithRetry(`${apiUrl}/song/url/v1?id=${songId}&level=${quality}`);
+            showLoading(false);
+            if (!data.data[0]?.url) {
+                alert('无法预览该歌曲！');
+                return;
+            }
+            let songUrl = data.data[0].url;
+            if (songUrl.startsWith('http://')) {
+                songUrl = songUrl.replace('http://', 'https://');
+            }
+            previewDiv.classList.remove('hidden');
+            previewDiv.style.position = 'fixed';
+            previewDiv.style.bottom = '20px';
+            previewDiv.style.right = '20px';
+            previewDiv.style.width = '300px';
+            previewDiv.style.zIndex = '1000';
+            previewDiv.innerHTML = `
+                <div class="bg-white p-4 rounded shadow-lg border glass-effect">
+                    <audio controls autoplay src="${songUrl}" class="w-full mt-2"></audio>
+                    <button class="button mt-2 close-preview">
+                      <span class="X"></span>
+                      <span class="Y"></span>
+                      <div class="close">Close</div>
+                    </button>
+                </div>
+            `;
+            previewDiv.querySelector('.close-preview').addEventListener('click', () => {
+                previewDiv.classList.add('hidden');
+                previewDiv.innerHTML = '';
+            });
+        } catch (error) {
+            showLoading(false);
+            console.error('预览失败:', error);
+            alert(error.name === 'AbortError' ? '预览超时，请稍后重试！' : '预览失败，请检查网络！');
+            previewDiv.classList.add('hidden');
+        }
+    }
+    if (e.target.closest('.download-btn')) {
+        const songId = e.target.closest('.download-btn').dataset.id;
+        const fileName = e.target.closest('.download-btn').dataset.name;
+        const quality = document.getElementById('quality-select').value;
+        isDownloading = true;
+        showLoading(true);
+        try {
+            const data = await fetchWithRetry(`${apiUrl}/song/url/v1?id=${songId}&level=${quality}`);
+            if (!data.data[0]?.url) {
+                alert('无法下载该歌曲！');
+                isDownloading = false;
+                showLoading(false);
+                return;
+            }
+            let songUrl = data.data[0].url;
+            if (songUrl.startsWith('http://')) {
+                songUrl = songUrl.replace('http://', 'https://');
+            }
+            const response = await fetch(songUrl);
+            if (!response.ok) throw new Error(`下载歌曲 ${songId} 失败`);
+            const blob = await response.blob();
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${fileName}.mp3`;
+            link.click();
+            isDownloading = false;
+            showLoading(false);
+        } catch (error) {
+            isDownloading = false;
+            showLoading(false);
+            console.error('单曲下载失败:', error);
+            alert(error.name === 'AbortError' ? '下载超时，请稍后重试！' : '下载失败，请检查网络！');
+        }
+    }
+});
+
+document.getElementById('download-btn').addEventListener('click', async () => {
+    const checkboxes = document.querySelectorAll('.song-checkbox:checked');
+    selectedSongs = Array.from(checkboxes).map(cb => ({
+        id: cb.dataset.id,
+        name: cb.parentElement.parentElement.querySelector('.download-btn').dataset.name
+    }));
+    if (selectedSongs.length === 0) {
+        alert('请先选择歌曲！');
+        return;
+    }
+    const ids = selectedSongs.map(s => s.id).join(',');
+    const quality = document.getElementById('quality-select').value;
+    isDownloading = true;
+    showLoading(true);
+    try {
+        const data = await fetchWithRetry(`${apiUrl}/song/url/v1?id=${ids}&level=${quality}`);
+        if (!data.data) {
+            alert('下载失败，请稍后重试！');
+            isDownloading = false;
+            showLoading(false);
+            return;
+        }
+        const zip = new JSZip();
+        const songMap = new Map(selectedSongs.map(song => [song.id, song.name]));
+        const promises = data.data.map(song => {
+            if (!song.url) return Promise.resolve();
+            let songUrl = song.url;
+            if (songUrl.startsWith('http://')) {
+                songUrl = songUrl.replace('http://', 'https://');
+            }
+            return fetch(songUrl)
+                .then(res => {
+                    if (!res.ok) throw new Error(`下载歌曲 ${song.id} 失败`);
+                    return res.blob();
+                })
+                .then(blob => {
+                    const fileName = songMap.get(song.id.toString()) || `song_${song.id}`;
+                    zip.file(`${fileName}.mp3`, blob);
+                })
+                .catch(error => console.error(`下载歌曲 ${song.id} 失败:`, error));
+        });
+        await Promise.all(promises);
+        const content = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(content);
+        link.download = '音乐下载.zip';
+        link.click();
+        isDownloading = false;
+        showLoading(false);
+    } catch (error) {
+        isDownloading = false;
+        showLoading(false);
+        console.error('批量下载失败:', error);
+        alert(error.name === 'AbortError' ? '下载超时，请稍后重试！' : '下载失败，请检查网络！');
+    }
+});
+    </script>
 </body>
 </html>
