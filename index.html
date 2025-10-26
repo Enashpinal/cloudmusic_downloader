@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网易云音乐批量下载器 V2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-id3-writer@3.0.8/dist/browser-id3-writer.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @font-face {
+            font-family: 'AlimamaFangYuanTiVF-Thin';
+            src: url('AlimamaFangYuanTiVF-Thin.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+
+        :root {
+            --primary: #ff6b35;
+            --primary-dark: #e55a2b;
+            --primary-light: #ff8c60;
+            --sidebar-width: 280px;
+            --sidebar-collapsed-width: 60px;
+        }
+
+        body {
+            font-family: 'AlimamaFangYuanTiVF-Thin', 'Segoe UI', Arial, sans-serif;
+            overflow-x: hidden;
+            background: url('https://t.alcy.cc/ycy') no-repeat center center fixed;
+            background-size: cover;
+            color: black;
+        }
+
+        svg {
+            color: black;
+            width: 16px;
+            height: 16px;
+        }
+
+        .liquid-glass {
+            position: relative;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: inherit;
+			overflow: hidden;
+        }
+
+        .liquid-glass::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: inherit;
+            mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect x="0" y="0" width="100%" height="100%" rx="0" ry="0" fill="white"/></svg>'),
+                url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%"><rect x="5" y="5" width="calc(100% - 10px)" height="calc(100% - 10px)" rx="21" ry="21" fill="white"/></svg>');
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .liquid-glass::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 1px 1px 0px 0px rgba(255, 255, 255, 0.2), 
+                        inset -1px -1px 0px 0px rgba(255, 255, 255, 0.3),
+                        inset 2px 2px 6px 2px rgba(255, 255, 255, 0.1), 
+                        inset -2px -2px 4px -1px rgba(255, 255, 255, 0.1);
+            border-radius: inherit;
+            pointer-events: none;
+        }
+
+        .liquid-glass-hover {
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .liquid-glass-hover:hover {
+            transform: scale(1.02);
+            filter: brightness(1.2);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            color: black;
+            transition: width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 1000;
+            overflow-x: hidden;
+            padding-top: 40px;
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+        }
+
+        .sidebar.collapsed .sidebar-header {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sidebar-nav {
+            padding: 10px 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            position: relative;
+            border-radius: 12px;
+            margin: 0 15px 10px;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+            filter: brightness(1.2);
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .nav-icon {
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .nav-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            transition: margin-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content.shifted {
+            margin-left: var(--sidebar-collapsed-width);
+        }
+
+        .top-bar {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            gap: 10px;
+            border-bottom-left-radius: 15px;
+            border-bottom-right-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .top-bar.hidden {
+            display: none;
+        }
+
+        .top-bar-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-left: 10px;
+            flex-shrink: 0;
+            color: black;
+        }
+
+        .search-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            max-width: 500px;
+        }
+
+        .search-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border-radius: 25px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+            color: black;
+            height: 32px;
+            box-sizing: border-box;
+        }
+
+        .search-input::placeholder {
+            color: rgba(0,0,0,0.5);
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .search-mode {
+            padding: 6px 12px;
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+            color: black;
+            height: 32px;
+            box-sizing: border-box;
+        }
+
+        .search-mode:hover {
+            border-color: var(--primary);
+        }
+
+        .content-area {
+            flex-grow: 1;
+            padding: 20px;
+            opacity: 1;
+            transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border-radius: 15px;
+            margin: 10px;
+            overflow-y: auto;
+        }
+
+        .content-area.fade-out {
+            opacity: 0;
+        }
+
+        .song-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            cursor: pointer;
+            animation: slide-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes slide-up {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .song-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .song-item.selected {
+            background: var(--primary);
+            filter: brightness(1.2);
+            box-shadow: 0 0 10px var(--primary);
+            border: none;
+        }
+
+        .song-cover {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+
+        .song-info {
+            flex-grow: 1;
+        }
+
+        .song-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: black;
+        }
+
+        .song-artist {
+            font-size: 14px;
+            color: rgba(0,0,0,0.7);
+        }
+
+        .song-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .action-btn:hover {
+            background: transparent;
+        }
+
+        .player-bar {
+            position: fixed;
+            bottom: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            height: 80px;
+            display: none;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 100;
+            transition: left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .player-bar.active {
+            display: flex;
+        }
+
+        .player-bar.shifted {
+            left: var(--sidebar-collapsed-width);
+        }
+
+        .player-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            cursor: pointer;
+        }
+
+        .player-progress-bar {
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+            background: var(--primary);
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        .player-cover {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            margin-right: 15px;
+        }
+
+        .player-details {
+            flex-grow: 1;
+        }
+
+        .player-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: black;
+        }
+
+        .player-artist {
+            font-size: 14px;
+            color: rgba(0,0,0,0.7);
+        }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .player-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .player-btn:hover {
+            background: transparent;
+        }
+
+        .player-btn.play-pause {
+            width: 50px;
+            height: 50px;
+        }
+
+        .player-options {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .volume-slider {
+            width: 80px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+            background: var(--primary-light);
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: var(--primary);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            position: relative;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        
+            backdrop-filter: blur(20px) saturate(150%);
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow:
+                inset 1px 1px 0px 0px rgba(255, 255, 255, 0.25),
+                inset -1px -1px 0px 0px rgba(255, 255, 255, 0.25),
+                inset 2px 2px 6px 2px rgba(255, 255, 255, 0.1),
+                inset -2px -2px 4px -1px rgba(255, 255, 255, 0.1),
+                0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-content::before, .modal-content::after {
+            position: fixed;
+            pointer-events: none;
+        }
+
+        .modal-header {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: black;
+        }
+
+        .modal-close {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .modal-close:hover {
+            transform: rotate(90deg);
+            background: transparent;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: black;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+            color: black;
+        }
+
+        .form-input:focus, .form-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border: none;
+            color: black;
+        }
+
+        .btn:hover {
+            background: transparent;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .download-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            position: relative;
+        }
+
+        .download-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .download-item:hover .edit-btn, .download-item:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .download-cover {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+
+        .download-info {
+            flex-grow: 1;
+        }
+
+        .download-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: black;
+        }
+
+        .download-details {
+            font-size: 14px;
+            color: rgba(0,0,0,0.7);
+        }
+
+        .edit-btn, .delete-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            opacity: 0;
+        }
+
+        .edit-btn {
+            right: 60px;
+        }
+
+        .delete-btn {
+            right: 15px;
+        }
+
+        .edit-btn:hover, .delete-btn:hover {
+            transform: translateY(-50%) scale(1.1);
+            background: transparent;
+        }
+
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .progress-container.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .progress-content {
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            padding: 30px;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .progress-container.active .progress-content {
+            transform: scale(1);
+        }
+
+        .progress-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: black;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            background: var(--primary);
+        }
+
+        .progress-text {
+            font-size: 16px;
+            color: rgba(0,0,0,0.7);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .quality-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .quality-option {
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+            color: black;
+        }
+
+        .quality-option:hover {
+            border-color: var(--primary);
+            background: transparent;
+        }
+
+        .quality-option.selected {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            filter: brightness(1.2);
+        }
+
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+
+        .top-bar-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border: none;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: black;
+        }
+
+        .top-bar-btn:hover {
+            background: transparent;
+        }
+
+        .back-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            margin-right: 5px;
+            flex-shrink: 0;
+            color: black;
+        }
+
+        .back-btn:hover {
+            background: transparent;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 50px 20px;
+            text-align: center;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            color: rgba(0,0,0,0.3);
+            margin-bottom: 15px;
+        }
+
+        .empty-text {
+            font-size: 18px;
+            color: rgba(0,0,0,0.5);
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0,0,0,0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: rgba(0,0,0,0.7);
+            font-size: 16px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+
+        .pagination-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.05);
+            color: black;
+        }
+
+        .pagination-btn:hover {
+            background: var(--primary-light);
+            border-color: var(--primary);
+        }
+
+        .pagination-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-text {
+            font-size: 16px;
+            color: black;
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 10;
+            margin-bottom: 5px;
+            background: rgba(0,0,0,0.8);
+            color: black;
+        }
+
+        .top-bar-btn:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .custom-slider {
+            position: relative;
+            height: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .custom-slider-thumb {
+            position: absolute;
+            top: -5px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            transition: left 0.1s linear;
+            background: var(--primary);
+        }
+
+        .custom-slider-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.1s linear;
+            background: var(--primary);
+        }
+
+        .custom-color-picker {
+            position: relative;
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .custom-color-thumb {
+            position: absolute;
+            top: -5px;
+            width: 30px;
+            height: 50px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            transform: translateX(-50%);
+        }
+
+        .preview-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            cursor: pointer;
+        }
+
+        .preview-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
+            transition: width 0.1s linear;
+        }
+
+        .preview-loading {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preview-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(0,0,0,0.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                background: url('https://t.alcy.cc/ycy') no-repeat center center fixed;
+                background-size: cover;
+            }
+
+            .sidebar {
+                width: var(--sidebar-collapsed-width);
+            }
+
+            .sidebar.collapsed {
+                width: 100vw;
+            }
+
+            .main-content {
+                margin-left: var(--sidebar-collapsed-width);
+            }
+
+            .main-content.shifted {
+                margin-left: 0;
+            }
+
+            .top-bar {
+                padding: 0 10px;
+                height: 50px;
+                gap: 5px;
+            }
+
+            .search-input {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
+            .search-mode {
+                padding: 4px 10px;
+                font-size: 12px;
+            }
+
+            .top-bar-btn {
+                width: 28px;
+                height: 28px;
+            }
+
+            .back-btn {
+                width: 28px;
+                height: 28px;
+            }
+
+            .player-bar {
+                left: var(--sidebar-collapsed-width);
+                padding: 0 10px;
+            }
+
+            .player-bar.shifted {
+                left: 0;
+            }
+
+            .modal-content {
+                width: 95%;
+                max-width: none;
+            }
+
+            .quality-options {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <svg style="display: none">
+        <defs>
+            <filter id="liquid_glass_filter" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="sidebar liquid-glass" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">网易云音乐批量下载器</div>
+        </div>
+        <div class="sidebar-nav">
+            <div class="nav-item liquid-glass liquid-glass-hover active" data-page="search">
+                <div class="nav-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="nav-text">搜索音乐</div>
+            </div>
+            <div class="nav-item liquid-glass liquid-glass-hover" data-page="downloads">
+                <div class="nav-icon">
+                    <i class="fas fa-download"></i>
+                </div>
+                <div class="nav-text">下载列表</div>
+            </div>
+            <div class="nav-item liquid-glass liquid-glass-hover" data-page="settings">
+                <div class="nav-icon">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <div class="nav-text">设置</div>
+            </div>
+			<div class="nav-item liquid-glass liquid-glass-hover" data-page="about">
+			    <div class="nav-icon">
+			        <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+			          <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"></path>
+			        </svg>
+			    </div>
+			    <div class="nav-text">关于</div>
+			</div>
+        </div>
+    </div>
+
+    <div class="main-content" id="main-content">
+        <div class="top-bar liquid-glass" id="top-bar">
+            <div class="back-btn hidden liquid-glass liquid-glass-hover" id="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </div>
+            <div class="top-bar-title" id="top-bar-title">搜索音乐</div>
+            <div class="search-container">
+                <select class="search-mode liquid-glass" id="search-mode">
+                    <option value="1">单曲</option>
+                    <option value="10">专辑</option>
+                    <option value="1000">歌单</option>
+                    <option value="playlist_id">歌单ID</option>
+                    <option value="album_id">专辑ID</option>
+                </select>
+                <input type="text" class="search-input liquid-glass" id="search-input" placeholder="搜索关键词或ID">
+                <button class="top-bar-btn liquid-glass liquid-glass-hover" id="search-btn" title="搜索">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="top-bar-actions" id="top-bar-actions">
+                <button class="top-bar-btn liquid-glass liquid-glass-hover" id="select-all-btn" title="全选">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM9 17l-4-4 1.41-1.41L9 14.17l7.59-7.59L18 8l-9 9z"/>
+                    </svg>
+                </button>
+                <button class="top-bar-btn liquid-glass liquid-glass-hover" id="download-all-btn" title="下载此页">
+                    <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"></path>
+                    </svg>
+                </button>
+                <button class="top-bar-btn liquid-glass liquid-glass-hover" id="download-selected-btn" title="下载选中">
+                    <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="content-area liquid-glass" id="content-area">
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-music"></i>
+                </div>
+                <div class="empty-text">搜索音乐开始使用</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="player-bar liquid-glass" id="player-bar">
+        <div class="player-progress" id="player-progress">
+            <div class="player-progress-bar" id="player-progress-bar"></div>
+        </div>
+        <div class="player-info">
+            <img class="player-cover" id="player-cover" src="https://via.placeholder.com/50" alt="封面">
+            <div class="player-details">
+                <div class="player-title" id="player-title">未播放</div>
+                <div class="player-artist" id="player-artist">-</div>
+            </div>
+        </div>
+        <div class="player-controls">
+            <div class="player-btn liquid-glass liquid-glass-hover" id="prev-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="11 17 6 12 11 7"/>
+                    <polyline points="18 17 13 12 18 7"/>
+                </svg>
+            </div>
+            <div class="player-btn play-pause liquid-glass liquid-glass-hover" id="play-pause-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5,3 5,21 16,12"/>
+                </svg>
+            </div>
+            <div class="player-btn liquid-glass liquid-glass-hover" id="next-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="13 17 18 12 13 7"/>
+                    <polyline points="6 17 11 12 6 7"/>
+                </svg>
+            </div>
+            <div class="player-btn liquid-glass liquid-glass-hover" id="loop-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="17,1 21,5 17,9"/>
+                    <path d="M3 9V5a2 2 0 0 1 2-2h14"/>
+                    <polyline points="7,15 3,19 7,23"/>
+                    <path d="M21 19V23a2 2 0 0 1-2 2H3"/>
+                </svg>
+            </div>
+        </div>
+        <div class="player-options">
+            <div class="volume-control">
+                <i class="fas fa-volume-up" style="color: black;"></i>
+                <input type="range" class="volume-slider liquid-glass" id="volume-slider" min="0" max="100" value="70">
+            </div>
+            <div class="player-btn liquid-glass liquid-glass-hover" id="download-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            </div>
+            <div class="player-btn liquid-glass liquid-glass-hover" id="quality-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82 .33H9a1.65 1.65 0 0 0 1 -1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06 .06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="download-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">下载设置</div>
+                <div class="modal-close liquid-glass liquid-glass-hover" id="download-modal-close">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">选择音质</div>
+                    <div class="quality-options" id="quality-options">
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="1">有损</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="4">标准</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="8">HQ</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="9">HQ增强</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover selected" data-quality="10">SQ无损</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="11">Hi-Res</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="12">杜比全景声</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="13">臻品全景声</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="14">高清母带</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="15">AI伴唱模式</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="16">AI5.1</div>
+                    </div>
+                </div>
+                <div class="form-group hidden" id="download-details-form-song">
+                    <div class="form-label">歌曲名称</div>
+                    <input type="text" class="form-input liquid-glass" id="download-song-name">
+                </div>
+                <div class="form-group hidden" id="download-details-form-artist">
+                    <div class="form-label">艺人名称</div>
+                    <input type="text" class="form-input liquid-glass" id="download-artist-name">
+                </div>
+                <div class="form-group hidden" id="download-details-form-album">
+                    <div class="form-label">专辑名称</div>
+                    <input type="text" class="form-input liquid-glass" id="download-album-name">
+                </div>
+                <div class="form-group hidden" id="download-details-form-file">
+                    <div class="form-label">下载文件名</div>
+                    <input type="text" class="form-input liquid-glass" id="download-file-name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary liquid-glass liquid-glass-hover" id="download-cancel-btn">取消</button>
+                <button class="btn btn-primary liquid-glass liquid-glass-hover" id="download-confirm-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="preview-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">预览设置</div>
+                <div class="modal-close liquid-glass liquid-glass-hover" id="preview-modal-close">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">选择预览音质</div>
+                    <div class="quality-options" id="preview-quality-options">
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="1">有损</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="4">标准</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="8">HQ</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="9">HQ增强</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover selected" data-quality="10">SQ无损</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="11">Hi-Res</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="12">杜比全景声</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="13">臻品全景声</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="14">高清母带</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="15">AI伴唱模式</div>
+                        <div class="quality-option liquid-glass liquid-glass-hover" data-quality="16">AI5.1</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary liquid-glass liquid-glass-hover" id="preview-cancel-btn">取消</button>
+                <button class="btn btn-primary liquid-glass liquid-glass-hover" id="preview-confirm-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-container" id="progress-container">
+        <div class="modal-overlay"></div>
+        <div class="progress-content liquid-glass">
+            <div class="progress-title" id="progress-title">正在处理</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="progress-text" id="progress-text">0%</div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
