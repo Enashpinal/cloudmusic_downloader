@@ -187,6 +187,10 @@ document.addEventListener('DOMContentLoaded', function() {
 								<span>QQ音乐</span>
 							</p>
 							<p>
+								<span>Github：</span>
+								<a href="https://github.com/Enashpinal/cloudmusic_downloader/" target="_blank" class="text-blue-600 hover:underline">Enashpinal/cloudmusic_downloader</a>
+							</p>
+							<p>
 								<span>网站仅用于学习交流 请勿用于商业或非法用途！<br>
 									少数重名歌曲搜索源和下载源可能出现不一致的情况。<br>
 									遇到音频链接获取失败、缓存失败、下载到的和搜索到的音乐不一致等问题可尝试多次重试。
@@ -898,6 +902,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    async function fetchAudioUrl(word, quality, songName) {
+        let firstResult = null;
+        const normalizedSongName = songName.toLowerCase();
+        for (let choose = 1; choose <= 10; choose++) {
+            try {
+                const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=${choose}&quality=${quality}`;
+                const response = await withRetry(() => fetch(url), retryCount);
+                const apiData = await response.json();
+                if (apiData.code === 200 && apiData.data && apiData.data.url) {
+                    if (choose === 1) {
+                        firstResult = apiData;
+                    }
+                    const normalizedApiSong = apiData.data.song.toLowerCase();
+                    if (normalizedApiSong === normalizedSongName) {
+                        return apiData;
+                    } else {
+                        console.log(`期望的标题：${songName} 和请求到的标题：${apiData.data.song} 不一致 当前choose：${choose}`);
+                    }
+                }
+            } catch (error) {}
+        }
+        return firstResult;
+    }
+
     async function handlePreview(index) {
         const item = contentArea.querySelector(`.song-item[data-index="${index}"]`);
         if (currentPreviewItem === item) {
@@ -921,22 +949,18 @@ document.addEventListener('DOMContentLoaded', function() {
             loading.innerHTML = '<div class="preview-spinner"></div>';
             item.appendChild(loading);
             const song = searchResults[index];
-            let word = encodeURIComponent(song.name + ' - ' + (song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''));
+            let word = encodeURIComponent(song.name + ' - ' + (song.ar?.[0]?.name || song.artists?.[0]?.name || song.artist || ''));
             let apiData;
             try {
-                const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedPreviewQuality}`;
-                const response = await withRetry(() => fetch(url), retryCount);
-                apiData = await response.json();
-                if (apiData.code !== 200 || !apiData.data || !apiData.data.url) {
+                apiData = await fetchAudioUrl(word, selectedPreviewQuality, song.name);
+                if (!apiData || !apiData.data || !apiData.data.url) {
                     throw new Error();
                 }
             } catch (error) {
                 word = encodeURIComponent(song.name);
                 try {
-                    const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedPreviewQuality}`;
-                    const response = await withRetry(() => fetch(url), retryCount);
-                    apiData = await response.json();
-                    if (apiData.code !== 200 || !apiData.data || !apiData.data.url) {
+                    apiData = await fetchAudioUrl(word, selectedPreviewQuality, song.name);
+                    if (!apiData || !apiData.data || !apiData.data.url) {
                         throw new Error();
                     }
                 } catch (error) {
@@ -1073,12 +1097,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     const song = items[i];
                     currentSongName = song.name;
                     progressTitle.textContent = `正在添加歌曲 ${currentSongName}`;
-                    let word = encodeURIComponent(song.name + ' - ' + (song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''));
+                    let word = encodeURIComponent(song.name + ' - ' + (song.ar?.[0]?.name || song.artists?.[0]?.name || song.artist || ''));
                     try {
-                        const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                        const response = await withRetry(() => fetch(url), retryCount);
-                        const apiData = await response.json();
-                        if (apiData.code === 200 && apiData.data && apiData.data.url) {
+                        const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
+                        if (apiData && apiData.data && apiData.data.url) {
                             const ext = getExtensionFromUrl(apiData.data.url);
                             results[i] = {
                                 url: apiData.data.url,
@@ -1094,10 +1116,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     } catch (error) {
                         word = encodeURIComponent(song.name);
                         try {
-                            const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                            const response = await withRetry(() => fetch(url), retryCount);
-                            const apiData = await response.json();
-                            if (apiData.code === 200 && apiData.data && apiData.data.url) {
+                            const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
+                            if (apiData && apiData.data && apiData.data.url) {
                                 const ext = getExtensionFromUrl(apiData.data.url);
                                 results[i] = {
                                     url: apiData.data.url,
@@ -1134,13 +1154,11 @@ document.addEventListener('DOMContentLoaded', function() {
         for (const song of erroredSongs) {
             progressTitle.textContent = `正在重试 ${song.name}`;
             currentSongName = song.name;
-            let word = encodeURIComponent(song.name + ' - ' + (song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''));
+            let word = encodeURIComponent(song.name + ' - ' + (song.ar?.[0]?.name || song.artists?.[0]?.name || song.artist || ''));
             let success = false;
             try {
-                const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                const response = await withRetry(() => fetch(url), retryCount);
-                const apiData = await response.json();
-                if (apiData.code === 200 && apiData.data && apiData.data.url) {
+                const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
+                if (apiData && apiData.data && apiData.data.url) {
                     const ext = getExtensionFromUrl(apiData.data.url);
                     downloadList.push({
                         url: apiData.data.url,
@@ -1157,10 +1175,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 word = encodeURIComponent(song.name);
                 try {
-                    const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                    const response = await withRetry(() => fetch(url), retryCount);
-                    const apiData = await response.json();
-                    if (apiData.code === 200 && apiData.data && apiData.data.url) {
+                    const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
+                    if (apiData && apiData.data && apiData.data.url) {
                         const ext = getExtensionFromUrl(apiData.data.url);
                         downloadList.push({
                             url: apiData.data.url,
@@ -1210,9 +1226,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function addToDownloadList(index) {
         const song = searchResults[index];
         downloadSongName.value = song.name;
-        downloadArtistName.value = song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || '';
+        downloadArtistName.value = song.ar?.[0]?.name || song.artists?.[0]?.name || '';
         downloadAlbumName.value = song.al?.name || song.album;
-        downloadFileName.value = `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || ''}`;
+        downloadFileName.value = `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}`;
         
         downloadDetailsFormSong.classList.remove('hidden');
         downloadDetailsFormArtist.classList.remove('hidden');
@@ -1225,10 +1241,8 @@ document.addEventListener('DOMContentLoaded', function() {
             progressContainer.classList.add('active');
             let word = encodeURIComponent(downloadSongName.value + ' - ' + downloadArtistName.value);
             try {
-                const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                const response = await withRetry(() => fetch(url), retryCount);
-                const apiData = await response.json();
-                if (apiData.code === 200 && apiData.data && apiData.data.url) {
+                const apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
+                if (apiData && apiData.data && apiData.data.url) {
                     const ext = getExtensionFromUrl(apiData.data.url);
                     const baseName = downloadFileName.value.trim() || `${downloadSongName.value} - ${downloadArtistName.value}`;
                     downloadList.push({
@@ -1249,10 +1263,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch (error) {
                 word = encodeURIComponent(downloadSongName.value);
                 try {
-                    const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                    const response = await withRetry(() => fetch(url), retryCount);
-                    const apiData = await response.json();
-                    if (apiData.code === 200 && apiData.data && apiData.data.url) {
+                    const apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
+                    if (apiData && apiData.data && apiData.data.url) {
                         const ext = getExtensionFromUrl(apiData.data.url);
                         const baseName = downloadFileName.value.trim() || `${downloadSongName.value} - ${downloadArtistName.value}`;
                         downloadList.push({
@@ -1281,9 +1293,9 @@ document.addEventListener('DOMContentLoaded', function() {
     async function downloadSingle(index) {
         const song = searchResults[index];
         downloadSongName.value = song.name;
-        downloadArtistName.value = song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || '';
+        downloadArtistName.value = song.ar?.[0]?.name || song.artists?.[0]?.name || '';
         downloadAlbumName.value = song.al?.name || song.album;
-        downloadFileName.value = `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || ''}`;
+        downloadFileName.value = `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}`;
         
         downloadDetailsFormSong.classList.remove('hidden');
         downloadDetailsFormArtist.classList.remove('hidden');
@@ -1300,19 +1312,15 @@ document.addEventListener('DOMContentLoaded', function() {
             let word = encodeURIComponent(downloadSongName.value + ' - ' + downloadArtistName.value);
             let apiData;
             try {
-                const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                const response = await withRetry(() => fetch(url), retryCount);
-                apiData = await response.json();
-                if (apiData.code !== 200 || !apiData.data || !apiData.data.url) {
+                apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
+                if (!apiData || !apiData.data || !apiData.data.url) {
                     throw new Error();
                 }
             } catch (error) {
                 word = encodeURIComponent(downloadSongName.value);
                 try {
-                    const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=1&quality=${selectedQuality}`;
-                    const response = await withRetry(() => fetch(url), retryCount);
-                    apiData = await response.json();
-                    if (apiData.code !== 200 || !apiData.data || !apiData.data.url) {
+                    apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
+                    if (!apiData || !apiData.data || !apiData.data.url) {
                         throw new Error();
                     }
                 } catch (error) {
