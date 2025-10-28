@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
 								<a href="https://github.com/Enashpinal/cloudmusic_downloader/" target="_blank" class="text-blue-600 hover:underline">Enashpinal/cloudmusic_downloader</a>
 							</p>
 							<p>
-								<span>网站仅用于学习交流 请勿用于商业或非法用途！<br>
+								<span>网站仅用于学习技术 请勿用于商业或非法用途！<br>
 									少数重名歌曲搜索源和下载源可能出现不一致的情况。<br>
 									遇到音频链接获取失败、缓存失败、下载到的和搜索到的音乐不一致等问题可尝试多次重试。
 								</span>
@@ -902,28 +902,114 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function fetchAudioUrl(word, quality, songName) {
-        let firstResult = null;
-        const normalizedSongName = songName.toLowerCase();
-        for (let choose = 1; choose <= 10; choose++) {
-            try {
-                const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}&choose=${choose}&quality=${quality}`;
-                const response = await withRetry(() => fetch(url), retryCount);
-                const apiData = await response.json();
-                if (apiData.code === 200 && apiData.data && apiData.data.url) {
-                    if (choose === 1) {
-                        firstResult = apiData;
-                    }
-                    const normalizedApiSong = apiData.data.song.toLowerCase();
-                    if (normalizedApiSong === normalizedSongName) {
-                        return apiData;
-                    } else {
-                        console.log(`期望的标题：${songName} 和请求到的标题：${apiData.data.song} 不一致 当前choose：${choose}`);
+    function editDistance(s1, s2) {
+        var costs = new Array();
+        for (var i = 0; i <= s1.length; i++) {
+            var lastValue = i;
+            for (var j = 0; j <= s2.length; j++) {
+                if (i == 0)
+                    costs[j] = j;
+                else {
+                    if (j > 0) {
+                        var newValue = costs[j - 1];
+                        if (s1.charAt(i - 1) != s2.charAt(j - 1))
+                            newValue = Math.min(Math.min(newValue, lastValue),
+                                costs[j]) + 1;
+                        costs[j - 1] = lastValue;
+                        lastValue = newValue;
                     }
                 }
-            } catch (error) {}
+            }
+            if (i > 0)
+                costs[s2.length] = lastValue;
         }
-        return firstResult;
+        return costs[s2.length];
+    }
+
+    function similarity(s1, s2) {
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+        var longer = s1;
+        var shorter = s2;
+        if (s1.length < s2.length) {
+            longer = s2;
+            shorter = s1;
+        }
+        var longerLength = longer.length;
+        if (longerLength == 0) {
+            return 1.0;
+        }
+        return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+    }
+
+    async function fetchAudioUrl(songName, artistsArray, albumName, quality) {
+        const hasChinese = /[\u4e00-\u9fa5]/.test(songName);
+        let word;
+        if (hasChinese) {
+            word = encodeURIComponent(songName);
+        } else {
+            const firstArtist = artistsArray[0] || '';
+            word = encodeURIComponent(`${songName} - ${firstArtist}`);
+        }
+        let selected = null;
+        const searchFn = async () => {
+            const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Search failed');
+            const apiData = await response.json();
+            if (apiData.code !== 200 || !apiData.data) throw new Error('Invalid search response');
+            return apiData.data;
+        };
+        let searchResults;
+        try {
+            searchResults = await withRetry(searchFn, retryCount);
+        } catch (error) {
+            return null;
+        }
+        if (searchResults.length === 0) return null;
+        selected = searchResults.find(item => item.song === songName && item.album === albumName);
+        if (selected) {
+            // proceed
+        } else {
+            let exactMatches = searchResults.filter(item => item.song === songName && artistsArray.some(art => item.singer.includes(art)));
+            if (exactMatches.length > 0) {
+                let albumMatches = exactMatches.filter(item => item.album === albumName);
+                selected = albumMatches.length > 0 ? albumMatches[0] : exactMatches[0];
+            } else {
+                let filtered = searchResults.filter(item => artistsArray.some(art => item.singer.includes(art)));
+                filtered = filtered.filter(item => item.song.includes(songName));
+                if (filtered.length > 0) {
+                    filtered.sort((a, b) => similarity(b.song, songName) - similarity(a.song, songName));
+                    selected = filtered[0];
+                } else {
+                    selected = searchResults[0];
+                }
+            }
+        }
+        if (!selected) return null;
+        const getUrlFn = async () => {
+            const getUrl = `https://api.vkeys.cn/v2/music/tencent/geturl?id=${selected.id}&quality=${quality}`;
+            const response = await fetch(getUrl);
+            if (!response.ok) throw new Error('Get URL failed');
+            const urlData = await response.json();
+            if (urlData.code !== 200 || !urlData.data || !urlData.data.url) throw new Error('Invalid URL response');
+            return urlData.data.url;
+        };
+        let audioUrl;
+        try {
+            audioUrl = await withRetry(getUrlFn, retryCount);
+        } catch (error) {
+            return null;
+        }
+        return {
+            code: 200,
+            data: {
+                url: audioUrl,
+                song: selected.song,
+                album: selected.album,
+                cover: selected.cover
+            }
+        };
     }
 
     async function handlePreview(index) {
@@ -949,25 +1035,13 @@ document.addEventListener('DOMContentLoaded', function() {
             loading.innerHTML = '<div class="preview-spinner"></div>';
             item.appendChild(loading);
             const song = searchResults[index];
-            let word = encodeURIComponent(song.name + ' - ' + (song.ar?.[0]?.name || song.artists?.[0]?.name || song.artist || ''));
-            let apiData;
-            try {
-                apiData = await fetchAudioUrl(word, selectedPreviewQuality, song.name);
-                if (!apiData || !apiData.data || !apiData.data.url) {
-                    throw new Error();
-                }
-            } catch (error) {
-                word = encodeURIComponent(song.name);
-                try {
-                    apiData = await fetchAudioUrl(word, selectedPreviewQuality, song.name);
-                    if (!apiData || !apiData.data || !apiData.data.url) {
-                        throw new Error();
-                    }
-                } catch (error) {
-                    alert('获取音频链接失败');
-                    item.removeChild(loading);
-                    return;
-                }
+            let artistsArray = song.ar?.map(a => a.name) || song.artists?.map(a => a.name) || [song.artist || ''];
+            let albumName = song.al?.name || song.album || '';
+            let apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedPreviewQuality);
+            if (!apiData || !apiData.data || !apiData.data.url) {
+                alert('获取音频链接失败');
+                item.removeChild(loading);
+                return;
             }
             currentAudio = new Audio('https://mscdownload.pages.dev/proxy?url=' + encodeURIComponent(apiData.data.url));
             currentAudio.addEventListener('loadeddata', () => {
@@ -1097,41 +1171,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     const song = items[i];
                     currentSongName = song.name;
                     progressTitle.textContent = `正在添加歌曲 ${currentSongName}`;
-                    let word = encodeURIComponent(song.name + ' - ' + (song.ar?.[0]?.name || song.artists?.[0]?.name || song.artist || ''));
+                    let artistsArray = song.ar?.map(a => a.name) || song.artists?.map(a => a.name) || [song.artist || ''];
+                    let albumName = song.al?.name || song.album || '';
                     try {
-                        const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
+                        const apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedQuality);
                         if (apiData && apiData.data && apiData.data.url) {
                             const ext = getExtensionFromUrl(apiData.data.url);
                             results[i] = {
                                 url: apiData.data.url,
                                 title: song.name,
-                                artist: song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || '',
-                                album: apiData.data.album || song.al?.name || song.album,
-                                fileName: `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}${ext}`,
+                                artist: artistsArray.join(', '),
+                                album: apiData.data.album || albumName,
+                                fileName: `${song.name} - ${artistsArray.join(', ')}${ext}`,
                                 cover: `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`
                             };
                         } else {
                             throw new Error();
                         }
-                    } catch (error) {
-                        word = encodeURIComponent(song.name);
-                        try {
-                            const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
-                            if (apiData && apiData.data && apiData.data.url) {
-                                const ext = getExtensionFromUrl(apiData.data.url);
-                                results[i] = {
-                                    url: apiData.data.url,
-                                    title: song.name,
-                                    artist: song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || '',
-                                    album: apiData.data.album || song.al?.name || song.album,
-                                    fileName: `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}${ext}`,
-                                    cover: `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`
-                                };
-                            } else {
-                                throw new Error();
-                            }
-                        } catch (error) {}
-                    }
+                    } catch (error) {}
                     completed++;
                     const percent = Math.round((completed / items.length) * 100);
                     progressBar.style.width = percent + '%';
@@ -1154,44 +1211,26 @@ document.addEventListener('DOMContentLoaded', function() {
         for (const song of erroredSongs) {
             progressTitle.textContent = `正在重试 ${song.name}`;
             currentSongName = song.name;
-            let word = encodeURIComponent(song.name + ' - ' + (song.ar?.[0]?.name || song.artists?.[0]?.name || song.artist || ''));
+            let artistsArray = song.ar?.map(a => a.name) || song.artists?.map(a => a.name) || [song.artist || ''];
+            let albumName = song.al?.name || song.album || '';
             let success = false;
             try {
-                const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
+                const apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedQuality);
                 if (apiData && apiData.data && apiData.data.url) {
                     const ext = getExtensionFromUrl(apiData.data.url);
                     downloadList.push({
                         url: apiData.data.url,
                         title: song.name,
-                        artist: song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || '',
-                        album: apiData.data.album || song.al?.name || song.album,
-                        fileName: `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}${ext}`,
+                        artist: artistsArray.join(', '),
+                        album: apiData.data.album || albumName,
+                        fileName: `${song.name} - ${artistsArray.join(', ')}${ext}`,
                         cover: `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`
                     });
                     success = true;
                 } else {
                     throw new Error();
                 }
-            } catch (error) {
-                word = encodeURIComponent(song.name);
-                try {
-                    const apiData = await fetchAudioUrl(word, selectedQuality, song.name);
-                    if (apiData && apiData.data && apiData.data.url) {
-                        const ext = getExtensionFromUrl(apiData.data.url);
-                        downloadList.push({
-                            url: apiData.data.url,
-                            title: song.name,
-                            artist: song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || '',
-                            album: apiData.data.album || song.al?.name || song.album,
-                            fileName: `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}${ext}`,
-                            cover: `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`
-                        });
-                        success = true;
-                    } else {
-                        throw new Error();
-                    }
-                } catch (error) {}
-            }
+            } catch (error) {}
             if (!success) {
                 errors.push(song.name);
             }
@@ -1226,9 +1265,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function addToDownloadList(index) {
         const song = searchResults[index];
         downloadSongName.value = song.name;
-        downloadArtistName.value = song.ar?.[0]?.name || song.artists?.[0]?.name || '';
+        downloadArtistName.value = song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || '';
         downloadAlbumName.value = song.al?.name || song.album;
-        downloadFileName.value = `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}`;
+        downloadFileName.value = `${song.name} - ${downloadArtistName.value}`;
         
         downloadDetailsFormSong.classList.remove('hidden');
         downloadDetailsFormArtist.classList.remove('hidden');
@@ -1239,52 +1278,25 @@ document.addEventListener('DOMContentLoaded', function() {
         downloadConfirmBtn.onclick = async function() {
             progressTitle.textContent = `正在添加歌曲 ${downloadSongName.value}`;
             progressContainer.classList.add('active');
-            let word = encodeURIComponent(downloadSongName.value + ' - ' + downloadArtistName.value);
-            try {
-                const apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
-                if (apiData && apiData.data && apiData.data.url) {
-                    const ext = getExtensionFromUrl(apiData.data.url);
-                    const baseName = downloadFileName.value.trim() || `${downloadSongName.value} - ${downloadArtistName.value}`;
-                    downloadList.push({
-                        url: apiData.data.url,
-                        title: downloadSongName.value,
-                        artist: downloadArtistName.value,
-                        album: apiData.data.album || downloadAlbumName.value,
-                        fileName: baseName + ext,
-                        cover: `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`
-                    });
-                    saveDownloadList();
-                    downloadModal.classList.remove('active');
-                    hideDetailsForms();
-                    alert('已添加到下载列表');
-                } else {
-                    throw new Error();
-                }
-            } catch (error) {
-                word = encodeURIComponent(downloadSongName.value);
-                try {
-                    const apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
-                    if (apiData && apiData.data && apiData.data.url) {
-                        const ext = getExtensionFromUrl(apiData.data.url);
-                        const baseName = downloadFileName.value.trim() || `${downloadSongName.value} - ${downloadArtistName.value}`;
-                        downloadList.push({
-                            url: apiData.data.url,
-                            title: downloadSongName.value,
-                            artist: downloadArtistName.value,
-                            album: apiData.data.album || downloadAlbumName.value,
-                            fileName: baseName + ext,
-                            cover: `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`
-                        });
-                        saveDownloadList();
-                        downloadModal.classList.remove('active');
-                        hideDetailsForms();
-                        alert('已添加到下载列表');
-                    } else {
-                        throw new Error();
-                    }
-                } catch (error) {
-                    alert('获取音频链接失败');
-                }
+            let artistsArray = downloadArtistName.value.split(', ').filter(a => a.trim());
+            let apiData = await fetchAudioUrl(downloadSongName.value, artistsArray, downloadAlbumName.value, selectedQuality);
+            if (apiData && apiData.data && apiData.data.url) {
+                const ext = getExtensionFromUrl(apiData.data.url);
+                const baseName = downloadFileName.value.trim() || `${downloadSongName.value} - ${downloadArtistName.value}`;
+                downloadList.push({
+                    url: apiData.data.url,
+                    title: downloadSongName.value,
+                    artist: downloadArtistName.value,
+                    album: apiData.data.album || downloadAlbumName.value,
+                    fileName: baseName + ext,
+                    cover: `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`
+                });
+                saveDownloadList();
+                downloadModal.classList.remove('active');
+                hideDetailsForms();
+                alert('已添加到下载列表');
+            } else {
+                alert('获取音频链接失败');
             }
             progressContainer.classList.remove('active');
         };
@@ -1293,9 +1305,9 @@ document.addEventListener('DOMContentLoaded', function() {
     async function downloadSingle(index) {
         const song = searchResults[index];
         downloadSongName.value = song.name;
-        downloadArtistName.value = song.ar?.[0]?.name || song.artists?.[0]?.name || '';
+        downloadArtistName.value = song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || '';
         downloadAlbumName.value = song.al?.name || song.album;
-        downloadFileName.value = `${song.name} - ${song.ar?.map(a => a.name).join(', ') || song.artists?.map(a => a.name).join(', ') || song.artist || ''}`;
+        downloadFileName.value = `${song.name} - ${downloadArtistName.value}`;
         
         downloadDetailsFormSong.classList.remove('hidden');
         downloadDetailsFormArtist.classList.remove('hidden');
@@ -1309,25 +1321,12 @@ document.addEventListener('DOMContentLoaded', function() {
             let cachedSize = 0;
             let currentSongName = downloadSongName.value;
             progressText.textContent = `已缓存: ${cachedSize.toFixed(2)} MB | 当前: ${currentSongName} | 0/1`;
-            let word = encodeURIComponent(downloadSongName.value + ' - ' + downloadArtistName.value);
-            let apiData;
-            try {
-                apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
-                if (!apiData || !apiData.data || !apiData.data.url) {
-                    throw new Error();
-                }
-            } catch (error) {
-                word = encodeURIComponent(downloadSongName.value);
-                try {
-                    apiData = await fetchAudioUrl(word, selectedQuality, downloadSongName.value);
-                    if (!apiData || !apiData.data || !apiData.data.url) {
-                        throw new Error();
-                    }
-                } catch (error) {
-                    alert('获取下载链接失败');
-                    progressContainer.classList.remove('active');
-                    return;
-                }
+            let artistsArray = downloadArtistName.value.split(', ').filter(a => a.trim());
+            let apiData = await fetchAudioUrl(downloadSongName.value, artistsArray, downloadAlbumName.value, selectedQuality);
+            if (!apiData || !apiData.data || !apiData.data.url) {
+                alert('获取下载链接失败');
+                progressContainer.classList.remove('active');
+                return;
             }
             try {
                 const proxyUrl = 'https://mscdownload.pages.dev/proxy?url=' + encodeURIComponent(apiData.data.url);
