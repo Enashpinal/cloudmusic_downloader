@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadModalClose = document.getElementById('download-modal-close');
     const downloadCancelBtn = document.getElementById('download-cancel-btn');
     const downloadConfirmBtn = document.getElementById('download-confirm-btn');
-    const qualityOptions = document.querySelectorAll('#quality-options .quality-option');
+    const qualityOptionsContainer = document.getElementById('quality-options');
     const progressContainer = document.getElementById('progress-container');
     const progressTitle = document.getElementById('progress-title');
     const progressBar = document.getElementById('progress-bar');
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewModalClose = document.getElementById('preview-modal-close');
     const previewCancelBtn = document.getElementById('preview-cancel-btn');
     const previewConfirmBtn = document.getElementById('preview-confirm-btn');
-    const previewQualityOptions = document.querySelectorAll('#preview-quality-options .quality-option');
+    const previewQualityOptionsContainer = document.getElementById('preview-quality-options');
 
     let currentPage = 'search';
     let selectedQuality = 10;
@@ -60,6 +60,33 @@ document.addEventListener('DOMContentLoaded', function() {
     let themeColor = '#ff6b35';
     let currentAudio = null;
     let currentPreviewItem = null;
+    let downloadSource = 'qq';
+
+    const qqQualities = [
+        {id: 1, name: '有损'},
+        {id: 4, name: '标准'},
+        {id: 8, name: 'HQ'},
+        {id: 9, name: 'HQ增强'},
+        {id: 10, name: 'SQ无损'},
+        {id: 11, name: 'Hi-Res'},
+        {id: 12, name: '杜比全景声'},
+        {id: 13, name: '臻品全景声'},
+        {id: 14, name: '高清母带'},
+        {id: 15, name: 'AI伴唱模式'},
+        {id: 16, name: 'AI5.1'}
+    ];
+
+    const neteaseQualities = [
+        {id: 1, name: '标准（64k）'},
+        {id: 2, name: '标准（128k）'},
+        {id: 3, name: 'HQ极高（192k）'},
+        {id: 4, name: 'HQ极高（320k）'},
+        {id: 5, name: 'SQ无损'},
+        {id: 6, name: 'Hi-Res'},
+        {id: 7, name: '高清臻音'},
+        {id: 8, name: '沉浸环绕声'},
+        {id: 9, name: '超清母带'}
+    ];
 
     async function withRetry(asyncFn, maxRetries = retryCount) {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -129,6 +156,13 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (currentPage === 'settings') {
                 contentArea.innerHTML = `
                     <div class="form-group">
+                        <div class="form-label">下载源</div>
+                        <select id="download-source-select" class="form-select">
+                            <option value="qq">QQ音乐</option>
+                            <option value="netease">网易云音乐</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <div class="form-label">下载列表添加请求并发数 (1-15)</div>
                         <div class="custom-slider" id="add-concurrency-slider">
                             <div class="custom-slider-fill" style="width: ${((addConcurrency - 1) / 14) * 100}%"></div>
@@ -169,6 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 setupSliders();
                 setupColorPicker();
+                setupDownloadSource();
             } else if (currentPage === 'about') {
 				contentArea.innerHTML = `
 					<div class="flex flex-col items-start justify-center h-full p-6" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
@@ -248,6 +283,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (slider.id === 'download-concurrency-slider') downloadConcurrency = val;
                     if (slider.id === 'retry-count-slider') retryCount = val;
                     if (slider.id === 'items-per-page-slider') itemsPerPage = val;
+                    saveSettings();
                 }
             });
         }
@@ -256,6 +292,15 @@ document.addEventListener('DOMContentLoaded', function() {
         createSliderHandler(downloadSlider, downloadValue, 1, 10, downloadConcurrency);
         createSliderHandler(retrySlider, retryValue, 2, 10, retryCount);
         createSliderHandler(itemsSlider, itemsValue, 20, 250, itemsPerPage);
+    }
+
+    function setupDownloadSource() {
+        const select = document.getElementById('download-source-select');
+        select.value = downloadSource;
+        select.addEventListener('change', function() {
+            downloadSource = this.value;
+            saveSettings();
+        });
     }
 
     function getColorPosition(color) {
@@ -361,6 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         document.addEventListener('mouseup', () => {
             isDragging = false;
+            saveSettings();
         });
     }
 
@@ -474,6 +520,28 @@ document.addEventListener('DOMContentLoaded', function() {
         if (saved) {
             downloadList = JSON.parse(saved);
         }
+    }
+
+    function saveSettings() {
+        localStorage.setItem('addConcurrency', addConcurrency);
+        localStorage.setItem('downloadConcurrency', downloadConcurrency);
+        localStorage.setItem('retryCount', retryCount);
+        localStorage.setItem('themeColor', themeColor);
+        localStorage.setItem('itemsPerPage', itemsPerPage);
+        localStorage.setItem('downloadSource', downloadSource);
+        localStorage.setItem('selectedQuality', selectedQuality);
+        localStorage.setItem('selectedPreviewQuality', selectedPreviewQuality);
+    }
+
+    function loadSettings() {
+        addConcurrency = parseInt(localStorage.getItem('addConcurrency')) || 5;
+        downloadConcurrency = parseInt(localStorage.getItem('downloadConcurrency')) || 3;
+        retryCount = parseInt(localStorage.getItem('retryCount')) || 5;
+        themeColor = localStorage.getItem('themeColor') || '#ff6b35';
+        itemsPerPage = parseInt(localStorage.getItem('itemsPerPage')) || 100;
+        downloadSource = localStorage.getItem('downloadSource') || 'qq';
+        selectedQuality = parseInt(localStorage.getItem('selectedQuality')) || 10;
+        selectedPreviewQuality = parseInt(localStorage.getItem('selectedPreviewQuality')) || 10;
     }
 
     function clearDownloadList() {
@@ -663,36 +731,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const offset = (page - 1) * itemsPerPage;
         let url = `https://163api.qijieya.cn/cloudsearch?keywords=${encodeURIComponent(keyword)}&type=${type}&limit=${itemsPerPage}&offset=${offset}`;
-        
         try {
-            const response = await fetch(url);
-            const apiData = await response.json();
-            
-            if (apiData.code === 200 && apiData.result) {
-                if (type === '1') {
-                    searchResults = apiData.result.songs || [];
-                    totalItems = apiData.result.songCount || 0;
-                } else if (type === '10') {
-                    searchResults = apiData.result.albums || [];
-                    totalItems = apiData.result.albumCount || 0;
-                } else if (type === '1000') {
-                    searchResults = apiData.result.playlists || [];
-                    totalItems = apiData.result.playlistCount || 0;
-                }
-                renderResults();
-            } else {
-                throw new Error('搜索失败');
-            }
+            const response = await withRetry(() => fetch(url));
+            const data = await response.json();
+            searchResults = type === '1' ? data.result.songs : type === '10' ? data.result.albums : data.result.playlists;
+            totalItems = type === '1' ? data.result.songCount : type === '10' ? data.result.albumCount : data.result.playlistCount;
+            renderResults(searchResults, type === '1', totalItems);
         } catch (error) {
-            console.error('搜索失败:', error);
-            contentArea.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-exclamation-circle"></i>
-                    </div>
-                    <div class="empty-text">搜索失败，请重试</div>
-                </div>
-            `;
+            contentArea.innerHTML = '<div class="empty-state"><div class="empty-text">搜索失败，请重试</div></div>';
         }
     }
 
@@ -704,34 +750,24 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
+        if (page === 1) {
+            try {
+                const detailResponse = await withRetry(() => fetch(`https://163api.qijieya.cn/playlist/detail?id=${id}`));
+                const detailData = await detailResponse.json();
+                currentPlaylistName = detailData.playlist.name;
+                topBarTitle.textContent = currentPlaylistName;
+            } catch (error) {}
+        }
+        
+        const offset = (page - 1) * itemsPerPage;
         try {
-            let detailResponse = await fetch(`https://163api.qijieya.cn/playlist/detail?id=${id}`);
-            let detailData = await detailResponse.json();
-            if (detailData.code !== 200 || !detailData.playlist) {
-                throw new Error('获取歌单详情失败');
-            }
-            currentPlaylistName = detailData.playlist.name;
-            totalItems = detailData.playlist.trackCount;
-
-            const offset = (page - 1) * itemsPerPage;
-            let tracksResponse = await fetch(`https://163api.qijieya.cn/playlist/track/all?id=${id}&limit=${itemsPerPage}&offset=${offset}`);
-            let tracksData = await tracksResponse.json();
-            if (tracksData.code !== 200) {
-                throw new Error('获取歌单歌曲失败');
-            }
-            searchResults = tracksData.songs || [];
-            renderResults();
-            topBarTitle.textContent = currentPlaylistName;
+            const trackResponse = await withRetry(() => fetch(`https://163api.qijieya.cn/playlist/track/all?id=${id}&limit=${itemsPerPage}&offset=${offset}`));
+            const trackData = await trackResponse.json();
+            searchResults = trackData.songs;
+            totalItems = trackData.total || searchResults.length;
+            renderResults(searchResults, true, totalItems);
         } catch (error) {
-            console.error('加载歌单失败:', error);
-            contentArea.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-exclamation-circle"></i>
-                    </div>
-                    <div class="empty-text">加载歌单失败，请重试</div>
-                </div>
-            `;
+            contentArea.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败，请重试</div></div>';
         }
     }
 
@@ -743,49 +779,24 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
+        const offset = (page - 1) * itemsPerPage;
         try {
-            let response = await fetch(`https://163api.qijieya.cn/album?id=${id}`);
-            let apiData = await response.json();
-            if (apiData.code !== 200) {
-                throw new Error('获取专辑详情失败');
-            }
-            currentAlbumName = apiData.album.name;
-            searchResults = apiData.songs || [];
-            totalItems = apiData.album.size || searchResults.length;
-            const start = (page - 1) * itemsPerPage;
-            searchResults = searchResults.slice(start, start + itemsPerPage);
-            searchResults.forEach(song => song.picUrl = apiData.album.picUrl);
-            renderResults();
+            const response = await withRetry(() => fetch(`https://163api.qijieya.cn/album?id=${id}`));
+            const data = await response.json();
+            searchResults = data.songs;
+            currentAlbumName = data.album.name;
             topBarTitle.textContent = currentAlbumName;
+            totalItems = searchResults.length;
+            const paginatedResults = searchResults.slice(offset, offset + itemsPerPage);
+            renderResults(paginatedResults, true, totalItems);
         } catch (error) {
-            console.error('加载专辑失败:', error);
-            contentArea.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-exclamation-circle"></i>
-                    </div>
-                    <div class="empty-text">加载专辑失败，请重试</div>
-                </div>
-            `;
+            contentArea.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败，请重试</div></div>';
         }
     }
 
-    function renderResults() {
-        if (searchResults.length === 0) {
-            contentArea.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">
-                        <i class="fas fa-search"></i>
-                    </div>
-                    <div class="empty-text">没有找到相关结果</div>
-                </div>
-            `;
-            return;
-        }
-        
+    function renderResults(results, isSong, total) {
         contentArea.innerHTML = '';
-        const isSong = currentView === 'search' && currentType === '1' || currentView === 'playlist' || currentView === 'album';
-        searchResults.forEach((item, index) => {
+        results.forEach((item, index) => {
             const songItem = document.createElement('div');
             songItem.className = 'song-item liquid-glass';
             songItem.dataset.index = index;
@@ -942,74 +953,79 @@ document.addEventListener('DOMContentLoaded', function() {
         return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
     }
 
-    async function fetchAudioUrl(songName, artistsArray, albumName, quality) {
-        const hasChinese = /[\u4e00-\u9fa5]/.test(songName);
-        let word;
-        if (hasChinese) {
-            word = encodeURIComponent(songName);
+    async function fetchAudioUrl(songName, artistsArray, albumName, quality, songId) {
+        if (downloadSource === 'netease') {
+            const getUrlFn = async () => {
+                const getUrl = `https://api.vkeys.cn/v2/music/netease?id=${songId}&quality=${quality}`;
+                const response = await fetch(getUrl);
+                if (!response.ok) throw new Error('Get URL failed');
+                const urlData = await response.json();
+                if (urlData.code !== 200 || !urlData.data || !urlData.data.url) throw new Error('Invalid URL response');
+                return urlData;
+            };
+            try {
+                return await withRetry(getUrlFn, retryCount);
+            } catch (error) {
+                return null;
+            }
         } else {
-            const firstArtist = artistsArray[0] || '';
-            word = encodeURIComponent(`${songName} - ${firstArtist}`);
-        }
-        let selected = null;
-        const searchFn = async () => {
-            const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Search failed');
-            const apiData = await response.json();
-            if (apiData.code !== 200 || !apiData.data) throw new Error('Invalid search response');
-            return apiData.data;
-        };
-        let searchResults;
-        try {
-            searchResults = await withRetry(searchFn, retryCount);
-        } catch (error) {
-            return null;
-        }
-        if (searchResults.length === 0) return null;
-        selected = searchResults.find(item => item.song === songName && item.album === albumName);
-        if (selected) {
-            // proceed
-        } else {
-            let exactMatches = searchResults.filter(item => item.song === songName && artistsArray.some(art => item.singer.includes(art)));
-            if (exactMatches.length > 0) {
-                let albumMatches = exactMatches.filter(item => item.album === albumName);
-                selected = albumMatches.length > 0 ? albumMatches[0] : exactMatches[0];
+            const hasChinese = /[\u4e00-\u9fa5]/.test(songName);
+            let word;
+            if (hasChinese) {
+                word = encodeURIComponent(songName);
             } else {
-                let filtered = searchResults.filter(item => artistsArray.some(art => item.singer.includes(art)));
-                filtered = filtered.filter(item => item.song.includes(songName));
-                if (filtered.length > 0) {
-                    filtered.sort((a, b) => similarity(b.song, songName) - similarity(a.song, songName));
-                    selected = filtered[0];
+                const firstArtist = artistsArray[0] || '';
+                word = encodeURIComponent(`${songName}`);
+            }
+            let selected = null;
+            const searchFn = async () => {
+                const url = `https://api.vkeys.cn/v2/music/tencent?word=${word}`;
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Search failed');
+                const apiData = await response.json();
+                if (apiData.code !== 200 || !apiData.data) throw new Error('Invalid search response');
+                return apiData.data;
+            };
+            let searchResults;
+            try {
+                searchResults = await withRetry(searchFn, retryCount);
+            } catch (error) {
+                return null;
+            }
+            if (searchResults.length === 0) return null;
+            selected = searchResults.find(item => item.song === songName && item.album === albumName);
+            if (selected) {
+            } else {
+                let exactMatches = searchResults.filter(item => item.song === songName && artistsArray.some(art => item.singer.includes(art)));
+                if (exactMatches.length > 0) {
+                    let albumMatches = exactMatches.filter(item => item.album === albumName);
+                    selected = albumMatches.length > 0 ? albumMatches[0] : exactMatches[0];
                 } else {
-                    selected = searchResults[0];
+                    let filtered = searchResults.filter(item => artistsArray.some(art => item.singer.includes(art)));
+                    filtered = filtered.filter(item => item.song.includes(songName));
+                    if (filtered.length > 0) {
+                        filtered.sort((a, b) => similarity(b.song, songName) - similarity(a.song, songName));
+                        selected = filtered[0];
+                    } else {
+                        selected = searchResults[0];
+                    }
                 }
             }
-        }
-        if (!selected) return null;
-        const getUrlFn = async () => {
-            const getUrl = `https://api.vkeys.cn/v2/music/tencent/geturl?id=${selected.id}&quality=${quality}`;
-            const response = await fetch(getUrl);
-            if (!response.ok) throw new Error('Get URL failed');
-            const urlData = await response.json();
-            if (urlData.code !== 200 || !urlData.data || !urlData.data.url) throw new Error('Invalid URL response');
-            return urlData.data.url;
-        };
-        let audioUrl;
-        try {
-            audioUrl = await withRetry(getUrlFn, retryCount);
-        } catch (error) {
-            return null;
-        }
-        return {
-            code: 200,
-            data: {
-                url: audioUrl,
-                song: selected.song,
-                album: selected.album,
-                cover: selected.cover
+            if (!selected) return null;
+            const getUrlFn = async () => {
+                const getUrl = `https://api.vkeys.cn/v2/music/tencent/geturl?id=${selected.id}&quality=${quality}`;
+                const response = await fetch(getUrl);
+                if (!response.ok) throw new Error('Get URL failed');
+                const urlData = await response.json();
+                if (urlData.code !== 200 || !urlData.data || !urlData.data.url) throw new Error('Invalid URL response');
+                return urlData;
+            };
+            try {
+                return await withRetry(getUrlFn, retryCount);
+            } catch (error) {
+                return null;
             }
-        };
+        }
     }
 
     async function handlePreview(index) {
@@ -1020,24 +1036,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         stopPreview();
         currentPreviewItem = item;
+        renderPreviewQualityOptions();
         previewModal.classList.add('active');
-        previewQualityOptions.forEach(opt => opt.classList.remove('selected'));
-        previewQualityOptions.forEach(opt => {
-            if (parseInt(opt.dataset.quality) === selectedPreviewQuality) {
-                opt.classList.add('selected');
-            }
-        });
         previewConfirmBtn.onclick = async function() {
-            selectedPreviewQuality = parseInt(document.querySelector('#preview-quality-options .selected').dataset.quality);
+            const selectedOpt = document.querySelector('#preview-quality-options .selected');
+            if (selectedOpt) {
+                selectedPreviewQuality = parseInt(selectedOpt.dataset.quality);
+                saveSettings();
+            }
             previewModal.classList.remove('active');
+            const song = searchResults[index];
+            let artistsArray = song.ar?.map(a => a.name) || song.artists?.map(a => a.name) || [song.artist || ''];
+            let albumName = song.al?.name || song.album || '';
             const loading = document.createElement('div');
             loading.className = 'preview-loading';
             loading.innerHTML = '<div class="preview-spinner"></div>';
             item.appendChild(loading);
-            const song = searchResults[index];
-            let artistsArray = song.ar?.map(a => a.name) || song.artists?.map(a => a.name) || [song.artist || ''];
-            let albumName = song.al?.name || song.album || '';
-            let apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedPreviewQuality);
+            let apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedPreviewQuality, song.id);
             if (!apiData || !apiData.data || !apiData.data.url) {
                 alert('获取音频链接失败');
                 item.removeChild(loading);
@@ -1146,12 +1161,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function showQualityModal(mode) {
         hideDetailsForms();
+        renderQualityOptions();
         downloadModal.classList.add('active');
         downloadConfirmBtn.onclick = function() {
+            const selectedOpt = document.querySelector('#quality-options .selected');
+            if (selectedOpt) {
+                selectedQuality = parseInt(selectedOpt.dataset.quality);
+                saveSettings();
+            }
             const songsToAdd = mode === 'all' ? searchResults : searchResults.filter((_, idx) => selectedSongs.has(idx));
             addMultipleToDownloadList(songsToAdd, mode);
             downloadModal.classList.remove('active');
         };
+    }
+
+    function renderQualityOptions() {
+        const qualities = downloadSource === 'netease' ? neteaseQualities : qqQualities;
+        qualityOptionsContainer.innerHTML = qualities.map(q => `
+            <div class="quality-option liquid-glass liquid-glass-hover ${q.id === selectedQuality ? 'selected' : ''}" data-quality="${q.id}">${q.name}</div>
+        `).join('');
+        document.querySelectorAll('#quality-options .quality-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('#quality-options .quality-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
+    }
+
+    function renderPreviewQualityOptions() {
+        const qualities = downloadSource === 'netease' ? neteaseQualities : qqQualities;
+        previewQualityOptionsContainer.innerHTML = qualities.map(q => `
+            <div class="quality-option liquid-glass liquid-glass-hover ${q.id === selectedPreviewQuality ? 'selected' : ''}" data-quality="${q.id}">${q.name}</div>
+        `).join('');
+        document.querySelectorAll('#preview-quality-options .quality-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('#preview-quality-options .quality-option').forEach(opt => opt.classList.remove('selected'));
+                this.classList.add('selected');
+            });
+        });
     }
 
     async function addMultipleToDownloadList(songs, mode) {
@@ -1174,7 +1221,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     let artistsArray = song.ar?.map(a => a.name) || song.artists?.map(a => a.name) || [song.artist || ''];
                     let albumName = song.al?.name || song.album || '';
                     try {
-                        const apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedQuality);
+                        const apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedQuality, song.id);
                         if (apiData && apiData.data && apiData.data.url) {
                             const ext = getExtensionFromUrl(apiData.data.url);
                             results[i] = {
@@ -1215,7 +1262,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let albumName = song.al?.name || song.album || '';
             let success = false;
             try {
-                const apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedQuality);
+                const apiData = await fetchAudioUrl(song.name, artistsArray, albumName, selectedQuality, song.id);
                 if (apiData && apiData.data && apiData.data.url) {
                     const ext = getExtensionFromUrl(apiData.data.url);
                     downloadList.push({
@@ -1273,13 +1320,19 @@ document.addEventListener('DOMContentLoaded', function() {
         downloadDetailsFormArtist.classList.remove('hidden');
         downloadDetailsFormAlbum.classList.remove('hidden');
         downloadDetailsFormFile.classList.remove('hidden');
+        renderQualityOptions();
         downloadModal.classList.add('active');
         
         downloadConfirmBtn.onclick = async function() {
+            const selectedOpt = document.querySelector('#quality-options .selected');
+            if (selectedOpt) {
+                selectedQuality = parseInt(selectedOpt.dataset.quality);
+                saveSettings();
+            }
             progressTitle.textContent = `正在添加歌曲 ${downloadSongName.value}`;
             progressContainer.classList.add('active');
             let artistsArray = downloadArtistName.value.split(', ').filter(a => a.trim());
-            let apiData = await fetchAudioUrl(downloadSongName.value, artistsArray, downloadAlbumName.value, selectedQuality);
+            let apiData = await fetchAudioUrl(downloadSongName.value, artistsArray, downloadAlbumName.value, selectedQuality, song.id);
             if (apiData && apiData.data && apiData.data.url) {
                 const ext = getExtensionFromUrl(apiData.data.url);
                 const baseName = downloadFileName.value.trim() || `${downloadSongName.value} - ${downloadArtistName.value}`;
@@ -1313,16 +1366,22 @@ document.addEventListener('DOMContentLoaded', function() {
         downloadDetailsFormArtist.classList.remove('hidden');
         downloadDetailsFormAlbum.classList.remove('hidden');
         downloadDetailsFormFile.classList.remove('hidden');
+        renderQualityOptions();
         downloadModal.classList.add('active');
         
         downloadConfirmBtn.onclick = async function() {
+            const selectedOpt = document.querySelector('#quality-options .selected');
+            if (selectedOpt) {
+                selectedQuality = parseInt(selectedOpt.dataset.quality);
+                saveSettings();
+            }
             progressTitle.textContent = `正在缓存歌曲 ${downloadSongName.value}`;
             progressContainer.classList.add('active');
             let cachedSize = 0;
             let currentSongName = downloadSongName.value;
             progressText.textContent = `已缓存: ${cachedSize.toFixed(2)} MB | 当前: ${currentSongName} | 0/1`;
             let artistsArray = downloadArtistName.value.split(', ').filter(a => a.trim());
-            let apiData = await fetchAudioUrl(downloadSongName.value, artistsArray, downloadAlbumName.value, selectedQuality);
+            let apiData = await fetchAudioUrl(downloadSongName.value, artistsArray, downloadAlbumName.value, selectedQuality, song.id);
             if (!apiData || !apiData.data || !apiData.data.url) {
                 alert('获取下载链接失败');
                 progressContainer.classList.remove('active');
@@ -1362,21 +1421,6 @@ document.addEventListener('DOMContentLoaded', function() {
             progressContainer.classList.remove('active');
         };
     }
-
-    qualityOptions.forEach(option => {
-        option.addEventListener('click', function() {
-            qualityOptions.forEach(opt => opt.classList.remove('selected'));
-            this.classList.add('selected');
-            selectedQuality = parseInt(this.dataset.quality);
-        });
-    });
-
-    previewQualityOptions.forEach(option => {
-        option.addEventListener('click', function() {
-            previewQualityOptions.forEach(opt => opt.classList.remove('selected'));
-            this.classList.add('selected');
-        });
-    });
 
     downloadModalClose.addEventListener('click', function() {
         downloadModal.classList.remove('active');
@@ -1428,6 +1472,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    loadSettings();
     loadDownloadList();
     updateContent();
     handleQueryParams();
