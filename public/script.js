@@ -60,7 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let themeColor = '#ff6b35';
     let currentAudio = null;
     let currentPreviewItem = null;
-    let downloadSource = 'qq';
+    let downloadSource = 'netease';
 
     const qqQualities = [
         {id: 1, name: '有损'},
@@ -219,7 +219,7 @@ document.addEventListener('DOMContentLoaded', function() {
 							</p>
 							<p>
 								<span>下载源：</span>
-								<span>QQ音乐</span>
+								<span>QQ音乐 / 网易云音乐</span>
 							</p>
 							<p>
 								<span>Github：</span>
@@ -227,9 +227,9 @@ document.addEventListener('DOMContentLoaded', function() {
 							</p>
 							<p>
 								<span>网站仅用于学习技术 请勿用于商业或非法用途！<br>
-									少数重名歌曲搜索源和下载源可能出现不一致的情况。<br>
-									遇到音频链接获取失败、缓存失败、下载到的和搜索到的音乐不一致等问题可尝试多次重试。
+								QQ下载源可能出现少数歌曲搜索源和下载源不一致的情况。<br>
 								</span>
+
 							</p>
 						</div>
 					</div>
@@ -539,9 +539,12 @@ document.addEventListener('DOMContentLoaded', function() {
         retryCount = parseInt(localStorage.getItem('retryCount')) || 5;
         themeColor = localStorage.getItem('themeColor') || '#ff6b35';
         itemsPerPage = parseInt(localStorage.getItem('itemsPerPage')) || 100;
-        downloadSource = localStorage.getItem('downloadSource') || 'qq';
+        downloadSource = localStorage.getItem('downloadSource') || 'netease';
         selectedQuality = parseInt(localStorage.getItem('selectedQuality')) || 10;
         selectedPreviewQuality = parseInt(localStorage.getItem('selectedPreviewQuality')) || 10;
+        document.documentElement.style.setProperty('--primary', themeColor);
+        document.documentElement.style.setProperty('--primary-dark', darkenColor(themeColor, 0.9));
+        document.documentElement.style.setProperty('--primary-light', lightenColor(themeColor, 1.1));
     }
 
     function clearDownloadList() {
@@ -617,7 +620,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             progressText.textContent = `已缓存: ${cachedSize.toFixed(2)} MB | 当前: ${currentSongName} | ${cachedCount}/${items.length}`;
                         }
                         let blob = new Blob(chunks);
-                        const taggedBlob = await addID3Tags(blob, item.title, item.artist, item.album, item.cover);
+                        let taggedBlob = blob;
+                        const ext = getExtensionFromUrl(item.url);
+                        if (ext === '.mp3') {
+                            taggedBlob = await addID3Tags(blob, item.title, item.artist, item.album, item.cover);
+                        }
                         results[i] = { blob: taggedBlob, item };
                         cachedCount++;
                     } catch (error) {}
@@ -654,7 +661,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     progressText.textContent = `已缓存: ${cachedSize.toFixed(2)} MB | 当前: 重试 ${currentSongName} | ${cachedCount}/${downloadList.length}`;
                 }
                 let blob = new Blob(chunks);
-                const taggedBlob = await addID3Tags(blob, item.title, item.artist, item.album, item.cover);
+                let taggedBlob = blob;
+                const ext = getExtensionFromUrl(item.url);
+                if (ext === '.mp3') {
+                    taggedBlob = await addID3Tags(blob, item.title, item.artist, item.album, item.cover);
+                }
                 blobs.push({ blob: taggedBlob, item });
                 cachedCount++;
             } catch (error) {
@@ -755,6 +766,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const detailResponse = await withRetry(() => fetch(`https://163api.qijieya.cn/playlist/detail?id=${id}`));
                 const detailData = await detailResponse.json();
                 currentPlaylistName = detailData.playlist.name;
+                totalItems = detailData.playlist.trackCount;
                 topBarTitle.textContent = currentPlaylistName;
             } catch (error) {}
         }
@@ -764,7 +776,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const trackResponse = await withRetry(() => fetch(`https://163api.qijieya.cn/playlist/track/all?id=${id}&limit=${itemsPerPage}&offset=${offset}`));
             const trackData = await trackResponse.json();
             searchResults = trackData.songs;
-            totalItems = trackData.total || searchResults.length;
             renderResults(searchResults, true, totalItems);
         } catch (error) {
             contentArea.innerHTML = '<div class="empty-state"><div class="empty-text">加载失败，请重试</div></div>';
@@ -1403,9 +1414,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     progressText.textContent = `已缓存: ${cachedSize.toFixed(2)} MB | 当前: ${currentSongName} | 0/1`;
                 }
                 let blob = new Blob(chunks);
-                const taggedBlob = await addID3Tags(blob, downloadSongName.value, downloadArtistName.value, downloadAlbumName.value, `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`);
-                progressText.textContent = `已缓存: ${cachedSize.toFixed(2)} MB | 当前: ${currentSongName} | 1/1`;
+                let taggedBlob = blob;
                 const ext = getExtensionFromUrl(apiData.data.url);
+                if (ext === '.mp3') {
+                    taggedBlob = await addID3Tags(blob, downloadSongName.value, downloadArtistName.value, downloadAlbumName.value, `https://mscdownload.pages.dev/proxy?url=${encodeURIComponent(apiData.data.cover)}`);
+                }
+                progressText.textContent = `已缓存: ${cachedSize.toFixed(2)} MB | 当前: ${currentSongName} | 1/1`;
                 const baseName = downloadFileName.value.trim() || `${downloadSongName.value} - ${downloadArtistName.value}`;
                 const fileName = baseName + ext;
                 const link = document.createElement('a');
