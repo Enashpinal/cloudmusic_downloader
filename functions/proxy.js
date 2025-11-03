@@ -19,7 +19,7 @@ export async function onRequest(context) {
   const urlMatch = rawQuery.match(/(?:^|&)url=(.*)/s); 
   if (!urlMatch || !urlMatch[1]) {
     return new Response(JSON.stringify({
-      error: "Missing target URL. Example usage: /proxy?url=https%3A%2F%2Fexample.com%2Fpath%3Fa%3D1"
+      error: "Missing target URL."
     }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -35,7 +35,7 @@ export async function onRequest(context) {
   }
 
   if (target.includes('/proxy')) {
-    return new Response(JSON.stringify({ error: 'Invalid nested proxy path detected.' }), {
+    return new Response(JSON.stringify({ error: 'Invalid path.' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -52,7 +52,7 @@ export async function onRequest(context) {
   }
 
   if (!['http:', 'https:'].includes(targetUrl.protocol) || isLocalAddress(targetUrl.hostname)) {
-    return new Response(JSON.stringify({ error: 'Blocked URL (unsupported protocol or local address).' }), {
+    return new Response(JSON.stringify({ error: 'Blocked URL.' }), {
       status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
@@ -99,7 +99,7 @@ export async function onRequest(context) {
       return Response.redirect(redirectTo, upstreamRes.status);
     }
   } catch (e) {
-    return new Response(JSON.stringify({ error: 'Upstream fetch error: ' + (e && e.message ? e.message : String(e)) }), {
+    return new Response(JSON.stringify({ error: 'Fetch error: ' + (e && e.message ? e.message : String(e)) }), {
       status: 502,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
