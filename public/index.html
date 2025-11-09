@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网易云音乐批量下载器 V2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browser-id3-writer@4.0.0/dist/browser-id3-writer.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @font-face {
+            font-family: 'AlimamaFangYuanTiVF-Thin';
+            src: url('AlimamaFangYuanTiVF-Thin.ttf') format('truetype');
+            font-weight: bold;
+            font-style: normal;
+        }
+        
+        :root {
+            --input-focus: #2d8cf0;
+            --font-color: #323232;
+            --font-color-sub: #666;
+            --bg-color: #f5f5dc;
+            --bg-color-alt: #666;
+            --main-color: #323232;
+            --sidebar-width: 280px;
+            --sidebar-collapsed-width: 60px;
+        }
+        
+        * {
+            box-sizing: border-box;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "PingFang SC";
+            color: var(--font-color);
+        }
+        
+        html {
+            height: 100%;
+            background: linear-gradient(135deg, #f5f5dc 0%, #e2e8f0 100%) fixed;
+        }
+        
+        body {
+            margin: 0;
+            min-height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        svg {
+            color: var(--font-color);
+            width: 16px;
+            height: 16px;
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--font-color-sub);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--main-color);
+        }
+        
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            transition: width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 1000;
+            overflow-x: hidden;
+            padding-top: 40px;
+            background: var(--bg-color);
+            border-right: 2px solid var(--main-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+        }
+        
+        .sidebar.collapsed .sidebar-header {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .sidebar-nav {
+            padding: 10px 0;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 20px;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            border-radius: 5px;
+            border: 2px solid var(--main-color);
+            box-shadow: 4px 4px var(--main-color);
+            margin: 0 15px 10px;
+            background: var(--bg-color);
+        }
+        
+        .nav-item:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .nav-item.active {
+            box-shadow: none;
+            transform: translate(3px, 3px);
+            border-color: var(--input-focus);
+        }
+        
+        .nav-item:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .nav-icon {
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        .nav-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .main-content {
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            transition: margin-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .main-content.shifted {
+            margin-left: var(--sidebar-collapsed-width);
+        }
+        
+        .top-bar {
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            gap: 10px;
+            border-bottom-left-radius: 5px;
+            border-bottom-right-radius: 5px;
+            background: var(--bg-color);
+            border: 2px solid var(--main-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .top-bar.hidden {
+            display: none;
+        }
+        
+        .top-bar-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+        
+        .search-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            max-width: 500px;
+        }
+        
+        .search-input {
+            flex-grow: 1;
+            height: 40px;
+            border-radius: 5px;
+            border: 2px solid var(--main-color);
+            background-color: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+            font-size: 15px;
+            font-weight: 600;
+            padding: 5px 10px;
+            outline: none;
+        }
+        
+        .search-input::placeholder {
+            color: var(--font-color-sub);
+            opacity: 0.8;
+        }
+        
+        .search-input:focus {
+            border: 2px solid var(--input-focus);
+        }
+        
+        .search-mode {
+            height: 40px;
+            border-radius: 5px;
+            border: 2px solid var(--main-color);
+            background-color: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+            font-size: 15px;
+            font-weight: 600;
+            padding: 5px 10px;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .search-mode:focus {
+            border: 2px solid var(--input-focus);
+        }
+        
+        .content-area {
+            flex-grow: 1;
+            padding: 20px;
+            opacity: 1;
+            transition: opacity 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border-radius: 5px;
+            margin: 10px;
+            overflow-y: auto;
+            background: var(--bg-color);
+            border: 2px solid var(--main-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .content-area.fade-out {
+            opacity: 0;
+        }
+        
+        .song-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            cursor: pointer;
+            animation: slide-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+            position: relative;
+        }
+        
+        @keyframes slide-up {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .song-item:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .song-item.selected {
+            transform: translate(3px, 3px);
+            box-shadow: none;
+            border-color: var(--input-focus);
+        }
+        
+        .song-item:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .song-cover {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+        
+        .song-info {
+            flex-grow: 1;
+        }
+        
+        .song-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .song-artist {
+            font-size: 14px;
+            color: var(--font-color-sub);
+        }
+        
+        .song-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .action-btn:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .action-btn:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .player-bar {
+            position: fixed;
+            bottom: 0;
+            left: var(--sidebar-width);
+            right: 0;
+            height: 80px;
+            display: none;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 100;
+            transition: left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            background: var(--bg-color);
+            border: 2px solid var(--main-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .player-bar.active {
+            display: flex;
+        }
+        
+        .player-bar.shifted {
+            left: var(--sidebar-collapsed-width);
+        }
+        
+        .player-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            cursor: pointer;
+            background: var(--bg-color-alt);
+        }
+        
+        .player-progress-bar {
+            height: 100%;
+            width: 0%;
+            transition: width 0.1s linear;
+            background: var(--input-focus);
+        }
+        
+        .player-info {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+        }
+        
+        .player-cover {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            margin-right: 15px;
+        }
+        
+        .player-details {
+            flex-grow: 1;
+        }
+        
+        .player-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .player-artist {
+            font-size: 14px;
+            color: var(--font-color-sub);
+        }
+        
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .player-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .player-btn:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .player-btn:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .player-btn.play-pause {
+            width: 50px;
+            height: 50px;
+        }
+        
+        .player-options {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .volume-slider {
+            width: 80px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+            background: var(--font-color-sub);
+            border-radius: 5px;
+        }
+        
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            background: var(--input-focus);
+        }
+        
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .modal-content {
+            position: relative;
+            border-radius: 5px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            background: var(--bg-color);
+            border: 2px solid var(--main-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            width: 30px;
+            height: 30px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .modal-close:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .modal-close:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            height: 40px;
+            border-radius: 5px;
+            border: 2px solid var(--main-color);
+            background-color: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+            font-size: 15px;
+            font-weight: 600;
+            padding: 5px 10px;
+            outline: none;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            border: 2px solid var(--input-focus);
+        }
+        
+        .modal-footer {
+            padding: 15px 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .btn {
+            width: 120px;
+            height: 40px;
+            border-radius: 5px;
+            border: 2px solid var(--main-color);
+            background-color: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .btn:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .btn:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .btn-primary {
+            border-color: var(--input-focus);
+        }
+        
+        .btn-secondary {
+            border-color: var(--font-color-sub);
+        }
+        
+        .download-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .download-item:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .download-item:hover .edit-btn, .download-item:hover .delete-btn {
+            opacity: 1;
+        }
+        
+        .download-cover {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin-right: 15px;
+            object-fit: cover;
+        }
+        
+        .download-info {
+            flex-grow: 1;
+        }
+        
+        .download-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .download-details {
+            font-size: 14px;
+            color: var(--font-color-sub);
+        }
+        
+        .edit-btn, .delete-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 36px;
+            height: 36px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            opacity: 0;
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .edit-btn {
+            right: 60px;
+        }
+        
+        .delete-btn {
+            right: 15px;
+        }
+        
+        .edit-btn:hover, .delete-btn:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .edit-btn:active, .delete-btn:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translateY(-50%) translate(3px, 3px);
+        }
+        
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        
+        .progress-container.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .progress-content {
+            border-radius: 5px;
+            width: 90%;
+            max-width: 400px;
+            padding: 30px;
+            text-align: center;
+            transform: scale(0.9);
+            transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            background: var(--bg-color);
+            border: 2px solid var(--main-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .progress-container.active .progress-content {
+            transform: scale(1);
+        }
+        
+        .progress-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            background: var(--bg-color-alt);
+            border: 2px solid var(--main-color);
+        }
+        
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            background: var(--input-focus);
+        }
+        
+        .progress-text {
+            font-size: 16px;
+            color: var(--font-color-sub);
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        .quality-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .quality-option {
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            text-align: center;
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .quality-option:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .quality-option.selected {
+            transform: translate(3px, 3px);
+            box-shadow: none;
+            border-color: var(--input-focus);
+        }
+        
+        .quality-option:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+        
+        .top-bar-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .top-bar-btn:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .top-bar-btn:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .back-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            margin-right: 5px;
+            flex-shrink: 0;
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .back-btn:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .back-btn:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 50px 20px;
+            text-align: center;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            color: var(--font-color-sub);
+            margin-bottom: 15px;
+        }
+        
+        .empty-text {
+            font-size: 18px;
+            color: var(--font-color-sub);
+        }
+        
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--font-color-sub);
+            border-radius: 50%;
+            border-top-color: var(--input-focus);
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: var(--font-color-sub);
+            font-size: 16px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        
+        .pagination-btn {
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            border: 2px solid var(--main-color);
+            background: var(--bg-color);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .pagination-btn:hover {
+            border-color: var(--input-focus);
+        }
+        
+        .pagination-btn:active {
+            box-shadow: 0px 0px var(--main-color);
+            transform: translate(3px, 3px);
+        }
+        
+        .pagination-btn.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination-text {
+            font-size: 16px;
+        }
+        
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            z-index: 10;
+            margin-bottom: 5px;
+            background: var(--bg-color-alt);
+            color: var(--bg-color);
+            border: 2px solid var(--main-color);
+        }
+        
+        .top-bar-btn:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .custom-slider {
+            position: relative;
+            height: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            background: var(--bg-color-alt);
+            border: 2px solid var(--main-color);
+        }
+        
+        .custom-slider-thumb {
+            position: absolute;
+            top: -5px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            transition: left 0.1s linear;
+            background: var(--input-focus);
+        }
+        
+        .custom-slider-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.1s linear;
+            background: var(--input-focus);
+        }
+        
+        .custom-color-picker {
+            position: relative;
+            width: 100%;
+            height: 40px;
+            background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+            border-radius: 5px;
+            cursor: pointer;
+            border: 2px solid var(--main-color);
+        }
+        
+        .custom-color-thumb {
+            position: absolute;
+            top: -5px;
+            width: 30px;
+            height: 50px;
+            background: var(--bg-color);
+            border: 2px solid var(--main-color);
+            border-radius: 5px;
+            transform: translateX(-50%);
+            box-shadow: 4px 4px var(--main-color);
+        }
+        
+        .preview-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--bg-color-alt);
+            cursor: pointer;
+        }
+        
+        .preview-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: var(--input-focus);
+            transition: width 0.1s linear;
+        }
+        
+        .preview-loading {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .preview-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--font-color-sub);
+            border-radius: 50%;
+            border-top-color: var(--input-focus);
+            animation: spin 1s linear infinite;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: var(--sidebar-collapsed-width);
+            }
+        
+            .sidebar.collapsed {
+                width: 100vw;
+            }
+        
+            .main-content {
+                margin-left: var(--sidebar-collapsed-width);
+            }
+        
+            .main-content.shifted {
+                margin-left: 0;
+            }
+        
+            .top-bar {
+                padding: 0 10px;
+                height: 50px;
+                gap: 5px;
+            }
+        
+            .search-input {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+        
+            .search-mode {
+                padding: 4px 10px;
+                font-size: 12px;
+            }
+        
+            .top-bar-btn {
+                width: 28px;
+                height: 28px;
+            }
+        
+            .back-btn {
+                width: 28px;
+                height: 28px;
+            }
+        
+            .player-bar {
+                left: var(--sidebar-collapsed-width);
+                padding: 0 10px;
+            }
+        
+            .player-bar.shifted {
+                left: 0;
+            }
+        
+            .modal-content {
+                width: 95%;
+                max-width: none;
+            }
+        
+            .quality-options {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <svg style="display: none">
+        <defs>
+            <filter id="liquid_glass_filter" x="0%" y="0%" width="100%" height="100%" filterUnits="objectBoundingBox">
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">网易云音乐批量下载器</div>
+        </div>
+        <div class="sidebar-nav">
+            <div class="nav-item active" data-page="search">
+                <div class="nav-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <div class="nav-text">搜索音乐</div>
+            </div>
+            <div class="nav-item" data-page="downloads">
+                <div class="nav-icon">
+                    <i class="fas fa-download"></i>
+                </div>
+                <div class="nav-text">下载列表</div>
+            </div>
+            <div class="nav-item" data-page="settings">
+                <div class="nav-icon">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <div class="nav-text">设置</div>
+            </div>
+			<div class="nav-item" data-page="about">
+			    <div class="nav-icon">
+			        <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+			          <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"></path>
+			        </svg>
+			    </div>
+			    <div class="nav-text">关于</div>
+			</div>
+        </div>
+    </div>
+
+    <div class="main-content" id="main-content">
+        <div class="top-bar" id="top-bar">
+            <div class="back-btn hidden" id="back-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+            </div>
+            <div class="top-bar-title" id="top-bar-title">搜索音乐</div>
+            <div class="search-container">
+                <select class="search-mode" id="search-mode">
+                    <option value="1">单曲</option>
+                    <option value="10">专辑</option>
+                    <option value="1000">歌单</option>
+                    <option value="playlist_id">歌单ID</option>
+                    <option value="album_id">专辑ID</option>
+                </select>
+                <input type="text" class="search-input" id="search-input" placeholder="搜索关键词或ID">
+                <button class="top-bar-btn" id="search-btn" title="搜索">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="top-bar-actions" id="top-bar-actions">
+                <button class="top-bar-btn" id="select-all-btn" title="全选">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM9 17l-4-4 1.41-1.41L9 14.17l7.59-7.59L18 8l-9 9z"/>
+                    </svg>
+                </button>
+                <button class="top-bar-btn" id="download-all-btn" title="下载此页">
+                    <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"></path>
+                    </svg>
+                </button>
+                <button class="top-bar-btn" id="download-selected-btn" title="下载选中">
+                    <svg data-slot="icon" fill="none" stroke-width="1.5" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="content-area" id="content-area">
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-music"></i>
+                </div>
+                <div class="empty-text">搜索音乐开始使用</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="player-bar" id="player-bar">
+        <div class="player-progress" id="player-progress">
+            <div class="player-progress-bar" id="player-progress-bar"></div>
+        </div>
+        <div class="player-info">
+            <img class="player-cover" id="player-cover" src="https://via.placeholder.com/50" alt="封面">
+            <div class="player-details">
+                <div class="player-title" id="player-title">未播放</div>
+                <div class="player-artist" id="player-artist">-</div>
+            </div>
+        </div>
+        <div class="player-controls">
+            <div class="player-btn" id="prev-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="11 17 6 12 11 7"/>
+                    <polyline points="18 17 13 12 18 7"/>
+                </svg>
+            </div>
+            <div class="player-btn play-pause" id="play-pause-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5,3 5,21 16,12"/>
+                </svg>
+            </div>
+            <div class="player-btn" id="next-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="13 17 18 12 13 7"/>
+                    <polyline points="6 17 11 12 6 7"/>
+                </svg>
+            </div>
+            <div class="player-btn" id="loop-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="17,1 21,5 17,9"/>
+                    <path d="M3 9V5a2 2 0 0 1 2-2h14"/>
+                    <polyline points="7,15 3,19 7,23"/>
+                    <path d="M21 19V23a2 2 0 0 1-2 2H3"/>
+                </svg>
+            </div>
+        </div>
+        <div class="player-options">
+            <div class="volume-control">
+                <i class="fas fa-volume-up"></i>
+                <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="70">
+            </div>
+            <div class="player-btn" id="download-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+            </div>
+            <div class="player-btn" id="quality-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82 .33H9a1.65 1.65 0 0 0 1 -1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06 .06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="download-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">下载设置</div>
+                <div class="modal-close" id="download-modal-close">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">选择音质</div>
+                    <div class="quality-options" id="quality-options">
+                    </div>
+                </div>
+                <div class="form-group hidden" id="download-details-form-song">
+                    <div class="form-label">歌曲名称</div>
+                    <input type="text" class="form-input" id="download-song-name">
+                </div>
+                <div class="form-group hidden" id="download-details-form-artist">
+                    <div class="form-label">艺人名称</div>
+                    <input type="text" class="form-input" id="download-artist-name">
+                </div>
+                <div class="form-group hidden" id="download-details-form-album">
+                    <div class="form-label">专辑名称</div>
+                    <input type="text" class="form-input" id="download-album-name">
+                </div>
+                <div class="form-group hidden" id="download-details-form-file">
+                    <div class="form-label">下载文件名</div>
+                    <input type="text" class="form-input" id="download-file-name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="download-cancel-btn">取消</button>
+                <button class="btn btn-primary" id="download-confirm-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="preview-modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">预览设置</div>
+                <div class="modal-close" id="preview-modal-close">
+                    <i class="fas fa-times"></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <div class="form-label">选择预览音质</div>
+                    <div class="quality-options" id="preview-quality-options">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="preview-cancel-btn">取消</button>
+                <button class="btn btn-primary" id="preview-confirm-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="progress-container" id="progress-container">
+        <div class="modal-overlay"></div>
+        <div class="progress-content">
+            <div class="progress-title" id="progress-title">正在处理</div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="progress-text" id="progress-text">0%</div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
